@@ -22,6 +22,9 @@ export interface Court {
   surface: string;
   is_indoor: boolean;
   default_hourly_rate: number;
+  discount_percentage?: number;
+  promo_badge?: string | null;
+  promo_subtext?: string | null;
   images?: CourtImage[];
 }
 
@@ -35,6 +38,7 @@ export interface Venue {
   state: string;
   latitude?: number;
   longitude?: number;
+  cover_image_url?: string;
   courts: Court[];
 }
 
@@ -116,6 +120,103 @@ export interface AdminSubscription {
   billing_cycle: "MONTHLY" | "QUARTERLY" | "ANNUAL";
   current_period_end: string;
   mrr_amount: number;
+}
+
+export interface AdminCourt {
+  id: string;
+  venue_id: string;
+  name: string;
+  sport_type: string;
+  surface: string;
+  is_indoor: boolean;
+  default_hourly_rate: number;
+  discount_percentage: number;
+  final_rate: number;
+  promo_badge?: string | null;
+  promo_subtext?: string | null;
+  is_active: boolean;
+  image_url?: string | null;
+}
+
+export interface AdminVenue {
+  id: string;
+  organization_id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  phone?: string;
+  address_street: string;
+  address_number: string;
+  address_complement?: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  latitude?: number;
+  longitude?: number;
+  cover_image_url?: string;
+  rating_average: number;
+  rating_count: number;
+  is_active: boolean;
+  owner_name?: string;
+  owner_email?: string;
+  owner_phone?: string;
+  organization_name?: string;
+  subscription_plan?: string;
+  subscription_status?: string;
+  courts: AdminCourt[];
+}
+
+export interface CreateVenueWithOwnerPayload {
+  name: string;
+  slug?: string;
+  description?: string;
+  phone?: string;
+  address_street: string;
+  address_number: string;
+  address_complement?: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  cover_image_url?: string;
+  owner_name: string;
+  owner_email: string;
+  owner_password: string;
+  owner_phone?: string;
+  courts?: {
+    name: string;
+    sport_type: string;
+    surface: string;
+    is_indoor?: boolean;
+    default_hourly_rate: number;
+    discount_percentage?: number;
+    promo_badge?: string;
+    promo_subtext?: string;
+    image_url?: string;
+  }[];
+}
+
+export interface UpdateCourtPricingPayload {
+  default_hourly_rate: number;
+  discount_percentage?: number;
+  promo_badge?: string;
+  promo_subtext?: string;
+  image_url?: string;
+}
+
+export interface UpdateVenuePayload {
+  name?: string;
+  description?: string;
+  phone?: string;
+  address_street?: string;
+  address_number?: string;
+  address_complement?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  cover_image_url?: string;
 }
 
 // Token helper
@@ -330,6 +431,50 @@ export const api = {
     if (planTier) query.append("plan_tier", planTier);
     const qs = query.toString() ? `?${query.toString()}` : "";
     return request<AdminSubscription[]>(`/admin/subscriptions${qs}`);
+  },
+
+  async getAdminVenues(): Promise<AdminVenue[]> {
+    return request<AdminVenue[]>("/admin/venues");
+  },
+
+  async createVenueWithOwner(payload: CreateVenueWithOwnerPayload): Promise<any> {
+    return request("/admin/venues", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateVenue(venueId: string, payload: UpdateVenuePayload): Promise<any> {
+    return request(`/admin/venues/${venueId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateCourtPricing(courtId: string, payload: UpdateCourtPricingPayload): Promise<any> {
+    return request(`/admin/courts/${courtId}/pricing`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async addCourtToVenue(venueId: string, payload: UpdateCourtPricingPayload & { name: string; sport_type: string; surface: string; is_indoor?: boolean }): Promise<any> {
+    const qs = new URLSearchParams({
+      name: payload.name,
+      sport_type: payload.sport_type,
+      surface: payload.surface,
+      is_indoor: String(payload.is_indoor || false),
+    }).toString();
+    return request(`/admin/venues/${venueId}/courts?${qs}`, {
+      method: "POST",
+      body: JSON.stringify({
+        default_hourly_rate: payload.default_hourly_rate,
+        discount_percentage: payload.discount_percentage,
+        promo_badge: payload.promo_badge,
+        promo_subtext: payload.promo_subtext,
+        image_url: payload.image_url,
+      }),
+    });
   },
 };
 

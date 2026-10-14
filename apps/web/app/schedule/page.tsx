@@ -255,6 +255,7 @@ function ScheduleContent() {
   const getSlotsForCourt = (court: Court) => {
     const slots = [];
     const baseRate = Number(court.default_hourly_rate || 100);
+    const courtDiscount = Number(court.discount_percentage || 0);
 
     for (let h = 7; h <= 22; h++) {
       const startStr = `${String(h).padStart(2, "0")}:00`;
@@ -263,13 +264,16 @@ function ScheduleContent() {
       const timeIntervalLabel = `${startStr} às ${endStr}`;
 
       // Preço dinâmico por horário:
-      // 07h-12h: Manhã promocional (-20%)
-      // 12h-17h: Horário normal
-      // 18h-22h: Horário nobre noturno (+30%)
+      // Se houver desconto configurado na quadra (ex: 10%), aplica diretamente!
       let slotRate = baseRate;
-      let badge = null;
+      let badge = court.promo_badge || null;
 
-      if (h < 12) {
+      if (courtDiscount > 0) {
+        slotRate = Math.round(baseRate * (1 - courtDiscount / 100));
+        if (!badge) {
+          badge = `${courtDiscount}% OFF`;
+        }
+      } else if (h < 12) {
         slotRate = Math.round(baseRate * 0.8);
         badge = "PROMO DIURNA (-20%)";
       } else if (h >= 18) {
@@ -626,9 +630,23 @@ function ScheduleContent() {
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Piso: <strong className="text-slate-700 capitalize">{court.surface?.toLowerCase() || "areia"}</strong> • Tarifa Padrão: <strong>R$ {Number(court.default_hourly_rate).toFixed(2)}/h</strong>
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-1">
+                      <span>Piso: <strong className="text-slate-700 capitalize">{court.surface?.toLowerCase() || "areia"}</strong></span>
+                      <span>•</span>
+                      {Number(court.discount_percentage || 0) > 0 ? (
+                        <span className="flex items-center gap-1.5">
+                          <span className="line-through text-slate-400">R$ {Number(court.default_hourly_rate).toFixed(2)}</span>
+                          <strong className="text-emerald-600 font-bold">
+                            R$ {(Number(court.default_hourly_rate) * (1 - Number(court.discount_percentage) / 100)).toFixed(2)}/h
+                          </strong>
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-amber-100 text-amber-800">
+                            {court.promo_badge || `${court.discount_percentage}% OFF`}
+                          </span>
+                        </span>
+                      ) : (
+                        <span>Tarifa Padrão: <strong>R$ {Number(court.default_hourly_rate).toFixed(2)}/h</strong></span>
+                      )}
+                    </div>
                   </div>
 
                   <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-100">

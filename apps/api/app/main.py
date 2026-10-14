@@ -18,6 +18,14 @@ async def lifespan(app: FastAPI):
     # Criação das tabelas do banco
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Garantir colunas de promoções e descontos em bancos existentes
+        try:
+            from sqlalchemy import text
+            await conn.execute(text("ALTER TABLE courts ADD COLUMN IF NOT EXISTS discount_percentage NUMERIC(5, 2) DEFAULT 0;"))
+            await conn.execute(text("ALTER TABLE courts ADD COLUMN IF NOT EXISTS promo_badge VARCHAR(100);"))
+            await conn.execute(text("ALTER TABLE courts ADD COLUMN IF NOT EXISTS promo_subtext VARCHAR(255);"))
+        except Exception as e:
+            logger.warning(f"Aviso de migração de colunas: {e}")
     logger.info("Tabelas verificadas e criadas.")
 
     # Popular dados de demonstração

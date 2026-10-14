@@ -81,7 +81,7 @@ async def get_venue_schedule(
 
     query = select(Venue).where(
         (Venue.id == id_or_slug) | (Venue.slug == id_or_slug)
-    ).options(selectinload(Venue.courts))
+    ).options(selectinload(Venue.courts).selectinload(Court.images))
     
     result = await db.execute(query)
     venue = result.scalar_one_or_none()
@@ -121,6 +121,9 @@ async def get_venue_schedule(
 
         slots = []
         base_rate = court.default_hourly_rate
+        discount_pct = court.discount_percentage or Decimal("0.00")
+        has_custom_discount = discount_pct > Decimal("0.00")
+        custom_rate = round(base_rate * (Decimal(1) - (discount_pct / Decimal(100))), 2) if has_custom_discount else base_rate
 
         for hour in range(7, 24):
             slot_start = datetime.combine(target_date, time(hour, 0), tzinfo=timezone.utc)
@@ -136,16 +139,20 @@ async def get_venue_schedule(
             # Checagem real de sobreposição de intervalo
             is_booked = any(b.start_time < slot_end and b.end_time > slot_start for b in court_bookings)
 
-            # Dinâmica de preços e badges inspirada na referência Agendei Quadras
+            # Dinâmica de preços: aplica desconto personalizado do admin se houver, ou regras padrão
             current_rate = base_rate
             original_rate = base_rate
             badge = None
             has_discount = False
 
-            if 18 <= hour <= 21:
+            if has_custom_discount:
+                current_rate = custom_rate
+                has_discount = True
+                badge = court.promo_badge or f"-{int(discount_pct)}%"
+            elif 18 <= hour <= 21:
                 badge = "🔥"
             elif hour < 12:
-                # Promoção diurna
+                # Promoção diurna padrão
                 current_rate = round(base_rate * Decimal("0.85"), 2)
                 has_discount = True
                 badge = "%"
@@ -165,6 +172,20 @@ async def get_venue_schedule(
                 )
             )
 
+        court_img = None
+        if court.images and len(court.images) > 0:
+            court_img = court.images[0].image_url
+        if not court_img:
+            court_img = venue.cover_image_url or court_images.get(court.sport_type, "https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?auto=format&fit=crop&w=600&q=80")
+
+        badge_text = court.promo_badge
+        if not badge_text and has_custom_discount:
+            badge_text = f"PROMO -{int(discount_pct)}% OFF"
+        elif not badge_text:
+            badge_text = "R$ 10,00 de desconto a cada 2h"
+
+        sub_text = court.promo_subtext or "Promoção especial ativa para este local"
+
         courts_schedule.append(
             CourtSchedule(
                 court_id=court.id,
@@ -173,10 +194,10 @@ async def get_venue_schedule(
                 surface=court.surface,
                 is_indoor=court.is_indoor,
                 default_hourly_rate=court.default_hourly_rate,
-                image_url=court_images.get(court.sport_type, "https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?auto=format&fit=crop&w=600&q=80"),
+                image_url=court_img,
                 address=address_str,
-                promo_badge="R$ 10,00 de desconto a cada 2h",
-                promo_subtext="Válido das 18:00 às 21:00 ao selecionar no mínimo 2h",
+                promo_badge=badge_text,
+                promo_subtext=sub_text,
                 slots=slots
             )
         )

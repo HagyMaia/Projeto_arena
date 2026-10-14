@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, time, timezone
+from decimal import Decimal
 from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, Numeric, String, Text, Time
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
@@ -47,6 +48,9 @@ class Court(Base):
     surface = Column(String(50), nullable=False) # SYNTHETIC_GRASS, PARQUET_WOOD, VINYL, SAND, etc.
     is_indoor = Column(Boolean, default=False, nullable=False)
     default_hourly_rate = Column(Numeric(10, 2), nullable=False)
+    discount_percentage = Column(Numeric(5, 2), default=Decimal("0.00"), nullable=True)
+    promo_badge = Column(String(100), nullable=True)
+    promo_subtext = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

@@ -56,11 +56,10 @@ async def get_current_user_payload(token: str = Depends(oauth2_scheme)) -> dict:
 def require_roles(*allowed_roles: str):
     def role_checker(payload: dict = Depends(get_current_user_payload)):
         user_role = payload.get("role")
-        if user_role not in allowed_roles and "SUPERADMIN" not in allowed_roles:
-            if user_role != "SUPERADMIN":
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Acesso não autorizado para o perfil do usuário"
-                )
+        if user_role != "SUPERADMIN" and user_role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acesso não autorizado para o perfil do usuário"
+            )
         return payload
     return role_checker
