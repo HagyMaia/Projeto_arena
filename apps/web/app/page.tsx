@@ -372,10 +372,10 @@ export default function MarketplacePage() {
                       </div>
 
                       <Link
-                        href={`/player?court_id=${court.id}&venue_name=${encodeURIComponent(court.venueName)}&court_name=${encodeURIComponent(court.name)}`}
+                        href={`/schedule?court_id=${court.id}&venue_id=${court.venue_id || ""}&venue_name=${encodeURIComponent(court.venueName)}&court_name=${encodeURIComponent(court.name)}`}
                         className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-emerald-600/20 transition group-hover:translate-x-0.5"
                       >
-                        Reservar
+                        Agendar Horário
                         <ArrowRight className="w-4 h-4" />
                       </Link>
                     </div>
@@ -465,10 +465,10 @@ export default function MarketplacePage() {
                     <p className="text-[11px] text-slate-500">Navegue pelas quadras com melhor avaliação</p>
                   </div>
                   <Link
-                    href="/player"
+                    href="/schedule"
                     className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold shadow hover:bg-emerald-500"
                   >
-                    Ver Todas
+                    Ver Agenda
                   </Link>
                 </div>
               </div>
