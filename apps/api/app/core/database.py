@@ -11,6 +11,7 @@ def parse_database_url(raw_url: str):
     Normaliza a URL do banco para suporte universal:
     - Converte 'postgres://' e 'postgresql://' para 'postgresql+asyncpg://'
     - Trata SSL para o asyncpg (requerido pelo Neon.tech e cloud DBs)
+    - Remove parâmetros específicos de libpq (sslmode, channel_binding) que não são aceitos pelo asyncpg
     """
     url = raw_url
     connect_args = {}
@@ -25,23 +26,18 @@ def parse_database_url(raw_url: str):
         url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
     parsed = urlparse(url)
-    query_params = parse_qs(parsed.query)
 
-    if "sslmode" in query_params:
-        mode = query_params.pop("sslmode")[0]
-        if mode in ("require", "verify-ca", "verify-full"):
-            connect_args["ssl"] = True
-    elif "neon.tech" in parsed.netloc:
+    if "neon.tech" in parsed.netloc or "sslmode" in parsed.query or "channel_binding" in parsed.query:
         connect_args["ssl"] = True
 
-    clean_query = urlencode(query_params, doseq=True)
+    # asyncpg não aceita parâmetros de libpq psql na URL (ex: channel_binding, sslmode)
     clean_url = urlunparse((
         parsed.scheme,
         parsed.netloc,
         parsed.path,
-        parsed.params,
-        clean_query,
-        parsed.fragment
+        "",
+        "",
+        ""
     ))
 
     return clean_url, connect_args

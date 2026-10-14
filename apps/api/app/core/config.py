@@ -15,11 +15,10 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 horas
 
-    # Conexão Banco: Suporta PostgreSQL (asyncpg) ou SQLite (aiosqlite)
-    # No Vercel serverless, apenas o diretório /tmp tem permissão de escrita
+    # Conexão Banco: Neon PostgreSQL (asyncpg) ou SQLite (aiosqlite)
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL",
-        "sqlite+aiosqlite:////tmp/arenago.db" if os.getenv("VERCEL") else "sqlite+aiosqlite:///./arenago.db"
+        "postgresql://neondb_owner:npg_BOZw5Q0UKJyz@ep-steep-thunder-b489dz1y-pooler.c-6.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
     )
 
     # Conexão Redis
