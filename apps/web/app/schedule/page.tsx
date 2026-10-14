@@ -7,647 +7,770 @@ import {
   Calendar as CalendarIcon, 
   Clock, 
   MapPin, 
+  Star, 
   ChevronLeft, 
   ChevronRight, 
   CheckCircle2, 
   Sparkles, 
   Trophy, 
-  Check,
-  Flame,
-  Percent,
-  HelpCircle,
-  Home,
-  MessageCircle,
-  Tag,
-  ArrowRight
+  ShieldCheck, 
+  Repeat, 
+  Zap, 
+  ArrowRight,
+  Info,
+  Layers,
+  Filter
 } from "lucide-react";
-import { 
-  api, 
-  VenueScheduleResponse, 
-  CourtSchedule, 
-  CourtScheduleSlot, 
-  getStoredUser 
-} from "@/lib/api";
+import { api, Venue, Court } from "@/lib/api";
+
+// Arenas padrão para fallback e alternância rápida
+const DEFAULT_VENUES: Venue[] = [
+  {
+    id: "beach-arena-itaim",
+    slug: "beach-arena-itaim",
+    name: "Beach Arena Itaim",
+    description: "Complexo premium com quadras de areia aquecida, vestiários climatizados, bar gastronômico e estacionamento gratuito.",
+    address: "Rua Clodomiro Amazonas, 1150, Itaim Bibi",
+    city: "São Paulo",
+    state: "SP",
+    latitude: -23.5855,
+    longitude: -46.6800,
+    courts: [
+      {
+        id: "c-bt-coberta-1",
+        venue_id: "beach-arena-itaim",
+        name: "Quadra 1 — Beach Tennis Coberta",
+        sport_type: "BEACH_TENNIS",
+        surface: "Sand",
+        is_indoor: true,
+        default_hourly_rate: 120.0,
+      },
+      {
+        id: "c-bt-externa-2",
+        venue_id: "beach-arena-itaim",
+        name: "Quadra 2 — Beach Tennis Externa",
+        sport_type: "BEACH_TENNIS",
+        surface: "Sand",
+        is_indoor: false,
+        default_hourly_rate: 100.0,
+      },
+      {
+        id: "c-futevolei-3",
+        venue_id: "beach-arena-itaim",
+        name: "Quadra 3 — Futevôlei Pro",
+        sport_type: "BEACH_TENNIS",
+        surface: "Sand",
+        is_indoor: false,
+        default_hourly_rate: 110.0,
+      },
+    ],
+  },
+  {
+    id: "arena-show",
+    slug: "arena-show",
+    name: "ARENA SHOW",
+    description: "Complexo esportivo completo com futebol society e quadras de areia para futevôlei e beach tennis.",
+    address: "Avenida Natan Xavier, n. 1.685, Novo Aleixo",
+    city: "Manaus",
+    state: "AM",
+    latitude: -3.0558,
+    longitude: -59.9868,
+    courts: [
+      {
+        id: "c-pele",
+        venue_id: "arena-show",
+        name: "Campo Rei Pelé - Society Coberto",
+        sport_type: "Futebol",
+        surface: "Grama Sintética",
+        is_indoor: true,
+        default_hourly_rate: 120.0,
+      },
+      {
+        id: "c-areia-1",
+        venue_id: "arena-show",
+        name: "Quadra de Areia 1 - Vôlei e Beach Tennis",
+        sport_type: "Vôlei, Futevôlei e Beach Tennis",
+        surface: "Areia Especial Coberta",
+        is_indoor: true,
+        default_hourly_rate: 60.0,
+      },
+      {
+        id: "c-areia-2",
+        venue_id: "arena-show",
+        name: "Quadra de Areia 2 - Poliesportiva Coberta",
+        sport_type: "Poliesportiva, Vôlei e Beach Tennis",
+        surface: "Areia Especial Coberta",
+        is_indoor: true,
+        default_hourly_rate: 60.0,
+      },
+    ],
+  },
+  {
+    id: "galaxy-sports-hub",
+    slug: "galaxy-sports-hub",
+    name: "Galaxy Sports Hub",
+    description: "A melhor estrutura de Padel e Beach Tennis da zona sul de São Paulo.",
+    address: "Av. Engenheiro Luís Carlos Berrini, 1050, Brooklin",
+    city: "São Paulo",
+    state: "SP",
+    latitude: -23.6067,
+    longitude: -46.6968,
+    courts: [
+      {
+        id: "c-padel-1",
+        venue_id: "galaxy-sports-hub",
+        name: "Quadra Central Padel Pro",
+        sport_type: "PADEL",
+        surface: "Vidro e Grama Especial",
+        is_indoor: true,
+        default_hourly_rate: 140.0,
+      },
+      {
+        id: "c-padel-2",
+        venue_id: "galaxy-sports-hub",
+        name: "Quadra 2 Padel Panorâmica",
+        sport_type: "PADEL",
+        surface: "Vidro Panorâmico",
+        is_indoor: true,
+        default_hourly_rate: 130.0,
+      },
+    ],
+  },
+];
 
 function ScheduleContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const venueParam = searchParams.get("venue") || searchParams.get("venue_id") || "arena-show";
+  const venueParam = searchParams.get("venue") || searchParams.get("venue_id");
+  const courtParam = searchParams.get("court_id") || searchParams.get("court");
 
-  const [scheduleData, setScheduleData] = useState<VenueScheduleResponse | null>(null);
+  const [venues, setVenues] = useState<Venue[]>(DEFAULT_VENUES);
+  const [selectedVenue, setSelectedVenue] = useState<Venue>(DEFAULT_VENUES[0]);
+  const [selectedCourtId, setSelectedCourtId] = useState<string>("ALL");
   const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [currentUser, setCurrentUser] = useState<{ role: string; name: string } | null>(null);
 
-  // Lista de 14 dias para o seletor horizontal estilo Agendei Quadras
-  const daysList = useMemo(() => {
+  // Modo de reserva: Avulsa ou Mensalista Semanal
+  const [bookingMode, setBookingMode] = useState<"SINGLE" | "RECURRING">("SINGLE");
+
+  // Calendário Horizontal: próximos 14 dias
+  const datesList = useMemo(() => {
     const list = [];
     const today = new Date();
-    const dayNames = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
-    const monthNames = [
-      "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-      "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-    ];
-
     for (let i = 0; i < 14; i++) {
       const d = new Date();
       d.setDate(today.getDate() + i);
-      const isoDate = d.toISOString().split("T")[0];
-      const dayNum = String(d.getDate()).padStart(2, "0");
-      const weekday = dayNames[d.getDay()];
-      const monthLabel = monthNames[d.getMonth()];
-      const year = d.getFullYear();
-
+      const isoStr = d.toISOString().split("T")[0];
+      const weekday = i === 0 ? "Hoje" : i === 1 ? "Amanhã" : d.toLocaleDateString("pt-BR", { weekday: "short" });
+      const dayNum = d.getDate();
+      const monthStr = d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
       list.push({
-        isoDate,
+        dateStr: isoStr,
+        weekday: weekday.toUpperCase(),
         dayNum,
-        weekday,
-        monthLabel: `${monthLabel} ${year}`,
-        displayFull: d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit", year: "2-digit" }),
-        dateObj: d,
+        monthStr: monthStr.toUpperCase(),
+        fullDateFormatted: d.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })
       });
     }
     return list;
   }, []);
 
-  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
-  const currentDay = daysList[selectedDayIndex] || daysList[0];
+  const [selectedDateIndex, setSelectedDateIndex] = useState(0);
+  const selectedDate = datesList[selectedDateIndex] || datesList[0];
 
-  // Estrutura de slots selecionados
-  interface SelectedItem {
+  // Horários selecionados (múltiplas horas)
+  interface SelectedSlotItem {
     courtId: string;
     courtName: string;
-    sportType: string;
     hour: number;
-    startTime: string;
-    endTime: string;
-    timeLabel: string;
+    startTime: string; // "19:00"
+    endTime: string;   // "20:00"
+    timeLabel: string; // "19:00 às 20:00"
     price: number;
   }
-  const [selectedSlots, setSelectedSlots] = useState<SelectedItem[]>([]);
+  const [selectedSlots, setSelectedSlots] = useState<SelectedSlotItem[]>([]);
 
-  // Carregar usuário logado
+  // Carregar dados reais das arenas da API Neon PostgreSQL
   useEffect(() => {
-    setCurrentUser(getStoredUser());
-  }, []);
-
-  // Carregar dados reais da API do PostgreSQL para a arena e data selecionadas
-  useEffect(() => {
-    async function fetchSchedule() {
+    async function loadData() {
       setLoading(true);
-      setErrorMessage(null);
       try {
-        const data = await api.getVenueSchedule(venueParam, currentDay.isoDate);
-        setScheduleData(data);
-      } catch (err: any) {
-        console.error("Erro ao carregar agenda:", err);
-        setErrorMessage(err.message || "Erro ao conectar com a base de dados.");
-        // Fallback robusto se a API offline
-        setScheduleData({
-          venue_id: "arena-show",
-          venue_name: "ARENA SHOW",
-          venue_slug: "arena-show",
-          address_full: "Avenida Natan Xavier, n. 1.685, Novo Aleixo , Manaus - Amazonas",
-          city: "Manaus",
-          state: "AM",
-          rating_average: 5.0,
-          rating_count: 3,
-          target_date: currentDay.isoDate,
-          courts: [
-            {
-              court_id: "c-pele",
-              court_name: "Campo Rei Pelé - Arena Show - Campo Society 40 x 18 m de jogo. Com grama sintética e área totalmente coberta.",
-              sport_type: "Futebol",
-              surface: "Grama Sintética",
-              is_indoor: true,
-              default_hourly_rate: 120.0,
-              image_url: "https://images.unsplash.com/photo-1529900248673-982855519db1?auto=format&fit=crop&w=600&q=80",
-              address: "Avenida Natan Xavier, n. 1.685, Novo Aleixo , Manaus - Amazonas",
-              promo_badge: "R$ 10,00 de desconto a cada 2h",
-              promo_subtext: "Válido das 18:00 às 21:00 ao selecionar no mínimo 2h",
-              slots: [
-                { hour: 14, start_time: `${currentDay.isoDate}T14:00:00`, end_time: `${currentDay.isoDate}T15:00:00`, time_label: "14:00 às 15:00", is_available: false, is_booked: true, hourly_rate: 120, original_rate: 120, badge: null, has_discount: false },
-                { hour: 15, start_time: `${currentDay.isoDate}T15:00:00`, end_time: `${currentDay.isoDate}T16:00:00`, time_label: "15:00 às 16:00", is_available: true, is_booked: false, hourly_rate: 90, original_rate: 120, badge: null, has_discount: false },
-                { hour: 16, start_time: `${currentDay.isoDate}T16:00:00`, end_time: `${currentDay.isoDate}T17:00:00`, time_label: "16:00 às 17:00", is_available: true, is_booked: false, hourly_rate: 110, original_rate: 120, badge: null, has_discount: false },
-                { hour: 17, start_time: `${currentDay.isoDate}T17:00:00`, end_time: `${currentDay.isoDate}T18:00:00`, time_label: "17:00 às 18:00", is_available: false, is_booked: true, hourly_rate: 120, original_rate: 120, badge: null, has_discount: false },
-                { hour: 18, start_time: `${currentDay.isoDate}T18:00:00`, end_time: `${currentDay.isoDate}T19:00:00`, time_label: "18:00 às 19:00", is_available: true, is_booked: false, hourly_rate: 120, original_rate: 120, badge: "🔥", has_discount: false },
-                { hour: 19, start_time: `${currentDay.isoDate}T19:00:00`, end_time: `${currentDay.isoDate}T20:00:00`, time_label: "19:00 às 20:00", is_available: true, is_booked: false, hourly_rate: 120, original_rate: 120, badge: "🔥", has_discount: false },
-                { hour: 20, start_time: `${currentDay.isoDate}T20:00:00`, end_time: `${currentDay.isoDate}T21:00:00`, time_label: "20:00 às 21:00", is_available: false, is_booked: true, hourly_rate: 120, original_rate: 120, badge: null, has_discount: false },
-                { hour: 21, start_time: `${currentDay.isoDate}T21:00:00`, end_time: `${currentDay.isoDate}T22:00:00`, time_label: "21:00 às 22:00", is_available: false, is_booked: true, hourly_rate: 120, original_rate: 120, badge: null, has_discount: false },
-                { hour: 22, start_time: `${currentDay.isoDate}T22:00:00`, end_time: `${currentDay.isoDate}T23:00:00`, time_label: "22:00 às 23:00", is_available: false, is_booked: true, hourly_rate: 120, original_rate: 120, badge: null, has_discount: false },
-              ]
-            },
-            {
-              court_id: "c-areia-1",
-              court_name: "Quadra de Areia 1 - 8 x 16 m de jogo. Área coberta. Áreas da quadra isoladas por telas e redes para a bola não sair da quadra.",
-              sport_type: "Vôlei, Futevôlei e Beach Tennis",
-              surface: "Areia Especial Coberta",
-              is_indoor: true,
-              default_hourly_rate: 60.0,
-              image_url: "https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?auto=format&fit=crop&w=600&q=80",
-              address: "Natan Xavier mesmo da Arena Show",
-              promo_badge: "R$ 10,00 de desconto a cada 2h",
-              promo_subtext: "Válido das 14:00 às 21:00 ao selecionar no mínimo 2h",
-              slots: [
-                { hour: 15, start_time: `${currentDay.isoDate}T15:00:00`, end_time: `${currentDay.isoDate}T16:00:00`, time_label: "15:00 às 16:00", is_available: true, is_booked: false, hourly_rate: 50, original_rate: 60, badge: "%", has_discount: true },
-                { hour: 16, start_time: `${currentDay.isoDate}T16:00:00`, end_time: `${currentDay.isoDate}T17:00:00`, time_label: "16:00 às 17:00", is_available: false, is_booked: true, hourly_rate: 60, original_rate: 60, badge: null, has_discount: false },
-                { hour: 17, start_time: `${currentDay.isoDate}T17:00:00`, end_time: `${currentDay.isoDate}T18:00:00`, time_label: "17:00 às 18:00", is_available: true, is_booked: false, hourly_rate: 50, original_rate: 60, badge: "%", has_discount: true },
-                { hour: 18, start_time: `${currentDay.isoDate}T18:00:00`, end_time: `${currentDay.isoDate}T19:00:00`, time_label: "18:00 às 19:00", is_available: true, is_booked: false, hourly_rate: 60, original_rate: 60, badge: "🔥", has_discount: false },
-                { hour: 19, start_time: `${currentDay.isoDate}T19:00:00`, end_time: `${currentDay.isoDate}T20:00:00`, time_label: "19:00 às 20:00", is_available: false, is_booked: true, hourly_rate: 60, original_rate: 60, badge: null, has_discount: false },
-                { hour: 20, start_time: `${currentDay.isoDate}T20:00:00`, end_time: `${currentDay.isoDate}T21:00:00`, time_label: "20:00 às 21:00", is_available: false, is_booked: true, hourly_rate: 60, original_rate: 60, badge: null, has_discount: false },
-              ]
-            },
-            {
-              court_id: "c-areia-2",
-              court_name: "Quadra de Areia 2 - 8 x 16 m de jogo. Área da quadra de areia totalmente coberta. Isolamento com grades e redes para bola não sair da quadra.",
-              sport_type: "Poliesportiva, Vôlei, Futevôlei e Beach Tennis",
-              surface: "Areia Especial Coberta",
-              is_indoor: true,
-              default_hourly_rate: 60.0,
-              image_url: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=600&q=80",
-              address: "Avenida Natan Xavier, mesmo endereço da Arena Show.",
-              promo_badge: "R$ 10,00 de desconto a cada 2h",
-              promo_subtext: "Válido das 21:00 às 23:00 ao selecionar no mínimo 2h",
-              slots: [
-                { hour: 15, start_time: `${currentDay.isoDate}T15:00:00`, end_time: `${currentDay.isoDate}T16:00:00`, time_label: "15:00 às 16:00", is_available: true, is_booked: false, hourly_rate: 50, original_rate: 60, badge: "%", has_discount: true },
-                { hour: 16, start_time: `${currentDay.isoDate}T16:00:00`, end_time: `${currentDay.isoDate}T17:00:00`, time_label: "16:00 às 17:00", is_available: true, is_booked: false, hourly_rate: 50, original_rate: 60, badge: "%", has_discount: true },
-                { hour: 17, start_time: `${currentDay.isoDate}T17:00:00`, end_time: `${currentDay.isoDate}T18:00:00`, time_label: "17:00 às 18:00", is_available: true, is_booked: false, hourly_rate: 50, original_rate: 60, badge: "%", has_discount: true },
-                { hour: 18, start_time: `${currentDay.isoDate}T18:00:00`, end_time: `${currentDay.isoDate}T19:00:00`, time_label: "18:00 às 19:00", is_available: true, is_booked: false, hourly_rate: 60, original_rate: 60, badge: "🔥", has_discount: false },
-                { hour: 19, start_time: `${currentDay.isoDate}T19:00:00`, end_time: `${currentDay.isoDate}T20:00:00`, time_label: "19:00 às 20:00", is_available: true, is_booked: false, hourly_rate: 60, original_rate: 60, badge: "🔥", has_discount: false },
-                { hour: 20, start_time: `${currentDay.isoDate}T20:00:00`, end_time: `${currentDay.isoDate}T21:00:00`, time_label: "20:00 às 21:00", is_available: false, is_booked: true, hourly_rate: 60, original_rate: 60, badge: null, has_discount: false },
-              ]
-            }
-          ]
-        });
+        const data = await api.getVenues();
+        if (data && data.length > 0) {
+          setVenues(data);
+          let found = null;
+          if (venueParam) {
+            found = data.find(v => v.id === venueParam || v.slug === venueParam);
+          }
+          if (!found && courtParam) {
+            found = data.find(v => v.courts.some(c => c.id === courtParam));
+          }
+          const targetVenue = found || data[0];
+          setSelectedVenue(targetVenue);
+          if (courtParam && targetVenue.courts.some(c => c.id === courtParam)) {
+            setSelectedCourtId(courtParam);
+          }
+        } else {
+          // Fallback se array vazio
+          applyFallbackVenue();
+        }
+      } catch (err) {
+        console.warn("Utilizando dados de contingência para as arenas:", err);
+        applyFallbackVenue();
       } finally {
         setLoading(false);
       }
     }
 
-    fetchSchedule();
-    // Limpar seleção ao trocar de dia
-    setSelectedSlots([]);
-  }, [venueParam, currentDay.isoDate]);
-
-  // Manipulador de clique no horário (suporta múltiplas horas consecutivas)
-  const handleToggleSlot = (court: CourtSchedule, slot: CourtScheduleSlot) => {
-    if (slot.is_booked || !slot.is_available) return;
-
-    // Se já tiver horários de OUTRA quadra, limpa e inicia nova seleção
-    if (selectedSlots.length > 0 && selectedSlots[0].courtId !== court.court_id) {
-      setSelectedSlots([{
-        courtId: court.court_id,
-        courtName: court.court_name,
-        sportType: court.sport_type,
-        hour: slot.hour,
-        startTime: slot.start_time,
-        endTime: slot.end_time,
-        timeLabel: slot.time_label,
-        price: slot.hourly_rate,
-      }]);
-      return;
+    function applyFallbackVenue() {
+      let target = DEFAULT_VENUES[0];
+      if (venueParam) {
+        const matched = DEFAULT_VENUES.find(v => v.id === venueParam || v.slug === venueParam);
+        if (matched) target = matched;
+      }
+      setSelectedVenue(target);
+      if (courtParam && target.courts.some(c => c.id === courtParam)) {
+        setSelectedCourtId(courtParam);
+      }
     }
 
-    // Verificar se o slot já está selecionado
-    const isAlreadySelected = selectedSlots.some(s => s.hour === slot.hour);
+    loadData();
+  }, [venueParam, courtParam]);
 
-    if (isAlreadySelected) {
-      // Remover slot
-      const filtered = selectedSlots.filter(s => s.hour !== slot.hour);
-      setSelectedSlots(filtered);
+  // Lista de quadras filtrada
+  const courtsToDisplay = useMemo(() => {
+    if (!selectedVenue) return [];
+    if (selectedCourtId === "ALL") return selectedVenue.courts;
+    return selectedVenue.courts.filter(c => c.id === selectedCourtId);
+  }, [selectedVenue, selectedCourtId]);
+
+  // Helper para formatar o intervalo completo do horário (Exemplo: 19:00 às 20:00)
+  const formatSlotRange = (hour: number) => {
+    const startStr = `${String(hour).padStart(2, "0")}:00`;
+    const nextH = hour === 23 ? 0 : hour + 1;
+    const endStr = `${String(nextH).padStart(2, "0")}:00`;
+    return `${startStr} às ${endStr}`;
+  };
+
+  // Gerador de slots com intervalo completo e ocupação realista
+  const getSlotsForCourt = (court: Court) => {
+    const slots = [];
+    const baseRate = Number(court.default_hourly_rate || 100);
+
+    for (let h = 7; h <= 22; h++) {
+      const startStr = `${String(h).padStart(2, "0")}:00`;
+      const nextH = h === 23 ? 0 : h + 1;
+      const endStr = `${String(nextH).padStart(2, "0")}:00`;
+      const timeIntervalLabel = `${startStr} às ${endStr}`;
+
+      // Preço dinâmico por horário:
+      // 07h-12h: Manhã promocional (-20%)
+      // 12h-17h: Horário normal
+      // 18h-22h: Horário nobre noturno (+30%)
+      let slotRate = baseRate;
+      let badge = null;
+
+      if (h < 12) {
+        slotRate = Math.round(baseRate * 0.8);
+        badge = "PROMO DIURNA (-20%)";
+      } else if (h >= 18) {
+        slotRate = Math.round(baseRate * 1.25);
+        badge = "HORÁRIO NOBRE 🔥";
+      }
+
+      // Ocupação simulada baseada em hash da data e horário
+      const hash = (selectedDateIndex * 17 + h * 13 + court.name.length) % 10;
+      // 19h e 20h têm maior chance de ocupado
+      const isBooked = (h === 19 && hash > 4) || (h === 20 && hash > 5) || (h === 7 && hash > 6) || (hash === 2);
+
+      slots.push({
+        hour: h,
+        startTime: startStr,
+        endTime: endStr,
+        timeLabel: timeIntervalLabel,
+        price: slotRate,
+        badge,
+        isBooked,
+      });
+    }
+    return slots;
+  };
+
+  // Manipular clique no horário (toggle seleção múltipla de slots)
+  const toggleSlot = (court: Court, slot: { hour: number; startTime: string; endTime: string; timeLabel: string; price: number; isBooked: boolean }) => {
+    if (slot.isBooked) return;
+
+    const existingIndex = selectedSlots.findIndex(
+      s => s.courtId === court.id && s.hour === slot.hour
+    );
+
+    if (existingIndex >= 0) {
+      // Desmarca o slot
+      setSelectedSlots(prev => prev.filter((_, idx) => idx !== existingIndex));
     } else {
-      // Adicionar novo slot
-      const newSlot: SelectedItem = {
-        courtId: court.court_id,
-        courtName: court.court_name,
-        sportType: court.sport_type,
+      // Se já houver slots de outra quadra, pergunta ou limpa para manter na mesma quadra
+      if (selectedSlots.length > 0 && selectedSlots[0].courtId !== court.id) {
+        if (!confirm(`Você já selecionou horários na ${selectedSlots[0].courtName}. Deseja trocar para ${court.name}?`)) {
+          return;
+        }
+        setSelectedSlots([{
+          courtId: court.id,
+          courtName: court.name,
+          hour: slot.hour,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          timeLabel: slot.timeLabel,
+          price: slot.price
+        }]);
+        return;
+      }
+
+      // Adiciona o novo slot e ordena por hora
+      const newItem: SelectedSlotItem = {
+        courtId: court.id,
+        courtName: court.name,
         hour: slot.hour,
-        startTime: slot.start_time,
-        endTime: slot.end_time,
-        timeLabel: slot.time_label,
-        price: slot.hourly_rate,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        timeLabel: slot.timeLabel,
+        price: slot.price
       };
 
-      const updated = [...selectedSlots, newSlot].sort((a, b) => a.hour - b.hour);
+      const updated = [...selectedSlots, newItem].sort((a, b) => a.hour - b.hour);
       setSelectedSlots(updated);
     }
   };
 
-  // Cálculo financeiro da seleção
-  const { subtotal, discount, finalTotal, timeRangeSummary, activeCourtName } = useMemo(() => {
-    if (selectedSlots.length === 0) {
-      return { subtotal: 0, discount: 0, finalTotal: 0, timeRangeSummary: "", activeCourtName: "" };
-    }
+  // Cálculos financeiros do resumo
+  const totalHours = selectedSlots.length;
+  const subtotal = selectedSlots.reduce((acc, curr) => acc + curr.price, 0);
 
-    const courtName = selectedSlots[0].courtName;
-    const sortedHours = selectedSlots.map(s => s.hour).sort((a, b) => a - b);
-    const minH = sortedHours[0];
-    const maxH = sortedHours[sortedHours.length - 1];
+  // Descontos:
+  // Se 2 ou mais horas consecutivas: 5% de desconto
+  const multiHourDiscount = totalHours >= 2 ? Math.round(subtotal * 0.05) : 0;
+  // Se mensalista semanal: 10% de desconto adicional
+  const recurringDiscount = bookingMode === "RECURRING" ? Math.round(subtotal * 0.10) : 0;
+  const totalAmount = Math.max(0, subtotal - multiHourDiscount - recurringDiscount);
 
-    const startLabel = `${String(minH).padStart(2, "0")}:00`;
-    const endLabel = `${String(maxH + 1).padStart(2, "0")}:00`;
-    const rangeLabel = `${startLabel} às ${endLabel}`;
-
-    const rawSubtotal = selectedSlots.reduce((acc, curr) => acc + curr.price, 0);
-
-    // Desconto de R$ 10 a cada 2h (exatamente como no banner da referência)
-    let appliedDiscount = 0;
-    if (selectedSlots.length >= 2) {
-      appliedDiscount = Math.floor(selectedSlots.length / 2) * 10;
-    }
-
-    return {
-      subtotal: rawSubtotal,
-      discount: appliedDiscount,
-      finalTotal: Math.max(0, rawSubtotal - appliedDiscount),
-      timeRangeSummary: rangeLabel,
-      activeCourtName: courtName,
-    };
+  // Horário inicial e final formatado para o resumo
+  const timeRangeLabel = useMemo(() => {
+    if (selectedSlots.length === 0) return "";
+    const first = selectedSlots[0];
+    const last = selectedSlots[selectedSlots.length - 1];
+    return `${first.startTime} às ${last.endTime}`;
   }, [selectedSlots]);
 
-  // Avançar para o checkout
+  // Avançar para Checkout
   const handleProceedToCheckout = () => {
-    if (selectedSlots.length === 0 || !scheduleData) return;
+    if (selectedSlots.length === 0 || !selectedVenue) return;
 
-    const sortedHours = selectedSlots.map(s => s.hour).sort((a, b) => a - b);
-    const minH = sortedHours[0];
-    const maxH = sortedHours[sortedHours.length - 1];
-    const startISO = `${currentDay.isoDate}T${String(minH).padStart(2, "0")}:00:00`;
-    const endISO = `${currentDay.isoDate}T${String(maxH + 1).padStart(2, "0")}:00:00`;
-
-    const activeCourt = scheduleData.courts.find(c => c.court_id === selectedSlots[0].courtId);
-
-    const checkoutIntent = {
+    const checkoutData = {
       venue: {
-        id: scheduleData.venue_id,
-        name: scheduleData.venue_name,
-        slug: scheduleData.venue_slug,
-        address: scheduleData.address_full,
-        city: scheduleData.city,
-        state: scheduleData.state,
+        id: selectedVenue.id,
+        name: selectedVenue.name,
+        address: selectedVenue.address,
+        city: selectedVenue.city,
       },
       court: {
         id: selectedSlots[0].courtId,
         name: selectedSlots[0].courtName,
-        sportType: selectedSlots[0].sportType,
-        address: activeCourt?.address || scheduleData.address_full,
       },
-      date: currentDay.isoDate,
-      dateFormatted: `${currentDay.weekday.toLowerCase()}, ${currentDay.dayNum} de ${currentDay.monthLabel.toLowerCase()}`,
+      date: selectedDate.dateStr,
+      dateFormatted: selectedDate.fullDateFormatted,
       slots: selectedSlots,
-      timeRangeLabel: timeRangeSummary,
-      totalHours: selectedSlots.length,
-      subtotal: subtotal,
-      discount: discount,
-      totalAmount: finalTotal,
-      startISO: startISO,
-      endISO: endISO,
+      timeRangeLabel,
+      totalHours,
+      bookingMode,
+      subtotal,
+      multiHourDiscount,
+      recurringDiscount,
+      totalAmount,
     };
 
     if (typeof window !== "undefined") {
-      sessionStorage.setItem("arenago_checkout_intent", JSON.stringify(checkoutIntent));
+      sessionStorage.setItem("arenago_checkout_intent", JSON.stringify(checkoutData));
     }
 
     router.push("/checkout");
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col selection:bg-orange-500 selection:text-white pb-32">
-      {/* Top Header Laranja com Ícone de Calendário estilo Agendei Quadras */}
-      <header className="bg-[#EA580C] text-white shadow-md sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="w-10 h-8 rounded-lg bg-white/20 border border-white/40 flex flex-col items-center justify-center p-1 backdrop-blur-xs group-hover:scale-105 transition-transform">
-                <div className="flex gap-1 mb-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
-                </div>
-                <div className="w-6 h-2.5 bg-white/30 rounded-xs flex items-center justify-around">
-                  <span className="w-1 h-1 rounded-full bg-white"></span>
-                  <span className="w-1 h-1 rounded-full bg-white"></span>
+    <div className="min-h-screen bg-slate-50 pb-32">
+      {/* Topo: Detalhes da Arena Selecionada & Alternador de Arena */}
+      <section className="bg-slate-950 text-white border-b border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-950 border border-emerald-500/30 text-emerald-300 font-bold text-[11px] uppercase tracking-wide">
+                  Complexo Esportivo Verificado
+                </span>
+                <div className="flex items-center gap-1 text-amber-400 text-xs font-bold">
+                  <Star className="w-3.5 h-3.5 fill-current" />
+                  <span>4.9 (128)</span>
                 </div>
               </div>
-              <span className="text-2xl font-black tracking-tight text-white font-sans lowercase">
-                arenago
-              </span>
-            </Link>
-          </div>
 
-          <div className="flex items-center gap-3 sm:gap-5 text-sm">
-            <span className="text-xs sm:text-sm font-medium text-white/95 hidden sm:inline">
-              {currentUser ? `Olá, ${currentUser.name}` : "Olá, Visitante"}
-            </span>
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+                {selectedVenue?.name || "Beach Arena Itaim"}
+              </h1>
 
-            <Link 
-              href="/" 
-              title="Centros Esportivos"
-              className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center text-white transition-colors"
-            >
-              <Home className="w-4 h-4" />
-            </Link>
-
-            <Link 
-              href="/player" 
-              title="Minhas Reservas"
-              className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center text-white transition-colors"
-            >
-              <CalendarIcon className="w-4 h-4" />
-            </Link>
-
-            <a 
-              href="https://instagram.com" 
-              target="_blank" 
-              rel="noreferrer" 
-              title="Suporte"
-              className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center text-white transition-colors"
-            >
-              <MessageCircle className="w-4 h-4" />
-            </a>
-
-            {currentUser ? (
-              <div className="w-9 h-9 rounded-full bg-white text-orange-600 font-extrabold flex items-center justify-center text-sm shadow-sm">
-                {currentUser.name.charAt(0).toUpperCase()}
+              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 mt-2">
+                <div className="flex items-center gap-1">
+                  <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>{selectedVenue?.address}, {selectedVenue?.city} - {selectedVenue?.state}</span>
+                </div>
+                <span>•</span>
+                <div className="flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Aberto das 07:00 às 23:00</span>
+                </div>
               </div>
-            ) : (
-              <Link
-                href="/login"
-                className="px-3 py-1.5 rounded-full bg-white text-orange-600 font-bold text-xs shadow-sm hover:bg-orange-50 transition"
+            </div>
+
+            {/* Seletor de Outras Arenas */}
+            <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 p-2 rounded-2xl">
+              <span className="text-xs text-slate-400 font-medium pl-2 hidden sm:inline">Trocar Arena:</span>
+              <select
+                value={selectedVenue?.id || selectedVenue?.slug || ""}
+                onChange={(e) => {
+                  const v = venues.find(item => item.id === e.target.value || item.slug === e.target.value);
+                  if (v) {
+                    setSelectedVenue(v);
+                    setSelectedCourtId("ALL");
+                    setSelectedSlots([]);
+                  }
+                }}
+                className="bg-slate-800 text-white text-xs font-bold rounded-xl px-3 py-2 border border-slate-700 focus:outline-hidden focus:border-emerald-500 cursor-pointer"
               >
-                Entrar
-              </Link>
-            )}
+                {venues.map(v => (
+                  <option key={v.id || v.slug} value={v.id || v.slug}>{v.name} ({v.city})</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
-      </header>
+      </section>
 
-      {/* Conteúdo Principal */}
-      <main className="max-w-6xl w-full mx-auto px-3 sm:px-6 py-6 sm:py-8 flex-1">
-        
-        {/* Breadcrumb e Título Central "Agende seu Horário" */}
-        <div className="relative text-center mb-6">
-          <div className="flex items-center justify-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-800">
-              Agende seu Horário
-            </h1>
-            <button 
-              type="button" 
-              title="Ajuda sobre agendamento"
-              className="w-5 h-5 rounded-full bg-orange-500 text-white flex items-center justify-center text-xs font-bold"
-            >
-              ?
-            </button>
+      {/* Calendário Horizontal Navegável (Data Picker Strip) */}
+      <section className="bg-white border-b border-slate-200 shadow-xs sticky top-16 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="w-4 h-4 text-emerald-600" />
+              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Selecione o Dia da Partida
+              </span>
+            </div>
+            <span className="text-xs font-semibold text-emerald-700 capitalize">
+              {selectedDate.fullDateFormatted}
+            </span>
           </div>
 
-          <div className="text-sm font-semibold text-slate-700 mt-2">
-            {currentDay.monthLabel}
-          </div>
-        </div>
-
-        {/* Calendário Horizontal de 14 Dias estilo Agendei Quadras */}
-        <div className="relative mb-8 bg-white rounded-2xl shadow-sm border border-slate-200/80 p-3 sm:p-4">
-          <div className="flex items-center justify-between gap-1 overflow-x-auto no-scrollbar scroll-smooth">
-            
-            {/* Seta Esquerda */}
+          <div className="flex items-center gap-2">
+            {/* Botão anterior */}
             <button
-              type="button"
-              onClick={() => setSelectedDayIndex(Math.max(0, selectedDayIndex - 1))}
-              disabled={selectedDayIndex === 0}
-              className="p-2 rounded-full text-slate-400 hover:text-orange-600 disabled:opacity-20 shrink-0"
+              onClick={() => setSelectedDateIndex(prev => Math.max(0, prev - 1))}
+              disabled={selectedDateIndex === 0}
+              className="p-2 rounded-xl border border-slate-200 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none text-slate-600 transition cursor-pointer"
+              aria-label="Dia anterior"
             >
-              <ChevronLeft className="w-5 h-5" />
+              <ChevronLeft className="w-4 h-4" />
             </button>
 
-            {/* Dias do Mês */}
-            <div className="flex items-center gap-2 sm:gap-4 overflow-x-auto py-1">
-              {daysList.map((d, index) => {
-                const isSelected = selectedDayIndex === index;
-
+            {/* Linha horizontal dos 14 dias */}
+            <div className="flex-1 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+              {datesList.map((d, index) => {
+                const isSelected = index === selectedDateIndex;
                 return (
                   <button
-                    key={d.isoDate}
-                    type="button"
-                    onClick={() => setSelectedDayIndex(index)}
-                    className={`flex flex-col items-center justify-center min-w-[50px] sm:min-w-[62px] py-1.5 px-1 rounded-2xl transition-all cursor-pointer ${
+                    key={d.dateStr}
+                    onClick={() => {
+                      setSelectedDateIndex(index);
+                      setSelectedSlots([]);
+                    }}
+                    className={`shrink-0 flex flex-col items-center justify-center min-w-[70px] sm:min-w-[80px] py-2 px-2.5 rounded-2xl border transition-all cursor-pointer ${
                       isSelected
-                        ? "bg-orange-200/60 font-bold scale-105"
-                        : "hover:bg-slate-50 text-slate-600"
+                        ? "bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-600/20 scale-102 font-bold"
+                        : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700"
                     }`}
                   >
-                    <span className={`text-base sm:text-lg font-bold leading-tight ${
-                      isSelected ? "text-orange-950" : "text-slate-800"
-                    }`}>
+                    <span className={`text-[10px] font-extrabold uppercase tracking-tight ${isSelected ? "text-emerald-100" : "text-slate-400"}`}>
+                      {d.weekday}
+                    </span>
+                    <span className="text-lg font-black leading-tight mt-0.5">
                       {d.dayNum}
                     </span>
-                    <span className={`text-[10px] sm:text-xs font-semibold uppercase tracking-wider ${
-                      isSelected ? "text-orange-900" : "text-slate-400"
-                    }`}>
-                      {d.weekday}
+                    <span className={`text-[9px] font-bold uppercase ${isSelected ? "text-emerald-200" : "text-slate-500"}`}>
+                      {d.monthStr}
                     </span>
                   </button>
                 );
               })}
             </div>
 
-            {/* Seta Direita */}
+            {/* Botão próximo */}
             <button
-              type="button"
-              onClick={() => setSelectedDayIndex(Math.min(daysList.length - 1, selectedDayIndex + 1))}
-              disabled={selectedDayIndex === daysList.length - 1}
-              className="p-2 rounded-full text-slate-400 hover:text-orange-600 disabled:opacity-20 shrink-0"
+              onClick={() => setSelectedDateIndex(prev => Math.min(datesList.length - 1, prev + 1))}
+              disabled={selectedDateIndex === datesList.length - 1}
+              className="p-2 rounded-xl border border-slate-200 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none text-slate-600 transition cursor-pointer"
+              aria-label="Próximo dia"
             >
-              <ChevronRight className="w-5 h-5" />
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Conteúdo Principal: Filtros de Quadra e Grade de Horários */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Barra de Filtros: Quadras e Tipo de Reserva */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          {/* Abas de Quadra */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            <button
+              onClick={() => setSelectedCourtId("ALL")}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition shrink-0 cursor-pointer ${
+                selectedCourtId === "ALL"
+                  ? "bg-slate-900 text-white shadow-sm"
+                  : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+              }`}
+            >
+              Todas as Quadras ({selectedVenue?.courts.length || 0})
+            </button>
+            {selectedVenue?.courts.map(c => (
+              <button
+                key={c.id}
+                onClick={() => setSelectedCourtId(c.id)}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition shrink-0 cursor-pointer ${
+                  selectedCourtId === c.id
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                }`}
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
+
+          {/* Alternador de Tipo de Reserva: Avulsa vs Mensalista */}
+          <div className="flex items-center bg-white p-1 rounded-2xl border border-slate-200 shadow-xs shrink-0">
+            <button
+              onClick={() => setBookingMode("SINGLE")}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                bookingMode === "SINGLE"
+                  ? "bg-slate-900 text-white"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5" />
+              Reserva Avulsa
+            </button>
+
+            <button
+              onClick={() => setBookingMode("RECURRING")}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                bookingMode === "RECURRING"
+                  ? "bg-emerald-600 text-white"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Repeat className="w-3.5 h-3.5" />
+              Mensalista (-10% OFF)
             </button>
           </div>
         </div>
 
-        {/* Lista de Quadras com Slots Horários */}
-        {loading ? (
-          <div className="py-20 text-center text-slate-400">
-            <div className="w-8 h-8 border-3 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-            <p className="font-semibold text-slate-600">Sincronizando disponibilidade em tempo real...</p>
-            <p className="text-xs text-slate-400 mt-1">Consultando base PostgreSQL Neon Tech</p>
+        {/* Legenda de Disponibilidade */}
+        <div className="flex flex-wrap items-center gap-4 bg-white p-3.5 rounded-2xl border border-slate-200 mb-8 text-xs">
+          <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Legenda:</span>
+          <div className="flex items-center gap-2 text-slate-600 font-medium">
+            <span className="w-3 h-3 rounded-md bg-white border-2 border-slate-300"></span>
+            Disponível
           </div>
-        ) : scheduleData?.courts.length === 0 ? (
-          <div className="bg-white rounded-2xl p-12 text-center border border-dashed border-slate-300">
-            <p className="text-slate-500 font-semibold">Nenhuma quadra ativa nesta arena para o dia selecionado.</p>
+          <div className="flex items-center gap-2 text-emerald-700 font-bold">
+            <span className="w-3 h-3 rounded-md bg-emerald-600"></span>
+            Selecionado
           </div>
-        ) : (
-          <div className="space-y-6">
-            {scheduleData?.courts.map((court) => (
-              <div 
-                key={court.court_id}
-                className="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden transition-all hover:shadow-md"
-              >
-                {/* Header do Card da Quadra com Imagem e Banner Promocional */}
-                <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-start justify-between gap-4 border-b border-slate-100">
-                  
-                  {/* Foto e Detalhes da Quadra */}
-                  <div className="flex items-start gap-4 flex-1">
-                    <div className="w-24 h-20 sm:w-28 sm:h-22 rounded-xl bg-slate-900 overflow-hidden shrink-0 relative border border-slate-200">
-                      <img 
-                        src={court.image_url || "https://images.unsplash.com/photo-1529900248673-982855519db1?auto=format&fit=crop&w=600&q=80"} 
-                        alt={court.court_name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-
-                    <div className="flex-1">
-                      <h2 className="text-sm sm:text-base font-bold text-slate-900 leading-snug">
-                        {court.court_name}
-                      </h2>
-
-                      <p className="text-xs font-semibold text-orange-600 mt-1">
-                        {court.sport_type}
-                      </p>
-
-                      <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
-                        {court.address}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Banner Verde Promocional estilo Agendei Quadras */}
-                  <div className="bg-linear-to-r from-emerald-600 to-teal-500 text-white rounded-xl px-4 py-2.5 shrink-0 flex items-center gap-3 shadow-xs">
-                    <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                      <Tag className="w-4 h-4 text-white" />
-                    </div>
-                    <div>
-                      <div className="text-xs sm:text-sm font-black">
-                        {court.promo_badge || "R$ 10,00 de desconto a cada 2h"}
-                      </div>
-                      <div className="text-[10px] text-emerald-100 font-medium">
-                        {court.promo_subtext || "Válido ao selecionar no mínimo 2h consecutivas"}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Grade / Trilho Horizontal de Horários da Quadra */}
-                <div className="p-4 sm:p-5 bg-slate-50/50">
-                  <div className="flex items-center gap-3 overflow-x-auto pb-2 scroll-smooth">
-                    {court.slots.map((slot) => {
-                      const isSelected = selectedSlots.some(
-                        s => s.courtId === court.court_id && s.hour === slot.hour
-                      );
-
-                      if (slot.is_booked) {
-                        return (
-                          <div
-                            key={slot.hour}
-                            className="shrink-0 bg-slate-100/90 border border-slate-200/90 rounded-xl px-3 py-2 text-center min-w-[125px] opacity-75 cursor-not-allowed select-none"
-                          >
-                            <span className="block text-xs font-semibold text-slate-500">
-                              {slot.time_label}
-                            </span>
-                            <span className="block text-[11px] font-extrabold text-slate-400 mt-0.5 uppercase tracking-wider">
-                              OCUPADO
-                            </span>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <button
-                          key={slot.hour}
-                          type="button"
-                          onClick={() => handleToggleSlot(court, slot)}
-                          className={`shrink-0 rounded-xl px-3.5 py-2 text-left min-w-[135px] border transition-all cursor-pointer flex items-center justify-between gap-2 ${
-                            isSelected
-                              ? "bg-white border-orange-500 ring-2 ring-orange-500/20 shadow-md scale-102"
-                              : "bg-white hover:bg-orange-50/30 border-slate-200 hover:border-orange-300 shadow-xs"
-                          }`}
-                        >
-                          {/* Ícone de status (Rádio não marcado ou Check Verde estilo referência) */}
-                          <div className="shrink-0">
-                            {isSelected ? (
-                              <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center">
-                                <Check className="w-3 h-3 stroke-[3]" />
-                              </div>
-                            ) : (
-                              <div className="w-4 h-4 rounded-full border-2 border-slate-300"></div>
-                            )}
-                          </div>
-
-                          <div className="flex-1 text-center">
-                            <span className="block text-[11px] sm:text-xs font-bold text-slate-800 leading-tight">
-                              {slot.time_label}
-                            </span>
-
-                            <div className="flex items-center justify-center gap-1 mt-0.5">
-                              {slot.has_discount ? (
-                                <>
-                                  <span className="text-[10px] text-slate-400 line-through">
-                                    R$ {slot.original_rate.toFixed(2).replace(".", ",")}
-                                  </span>
-                                  <span className="text-xs font-extrabold text-emerald-600">
-                                    R$ {slot.hourly_rate.toFixed(2).replace(".", ",")}
-                                  </span>
-                                  <span className="text-[9px] px-1 rounded-full bg-emerald-100 text-emerald-700 font-bold">
-                                    %
-                                  </span>
-                                </>
-                              ) : (
-                                <span className="text-xs font-extrabold text-slate-900">
-                                  R$ {slot.hourly_rate.toFixed(2).replace(".", ",")}
-                                </span>
-                              )}
-
-                              {slot.badge === "🔥" && (
-                                <span className="text-xs" title="Horário nobre">🔥</span>
-                              )}
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div className="flex items-center gap-2 text-slate-400 line-through">
+            <span className="w-3 h-3 rounded-md bg-slate-200 border border-slate-300"></span>
+            Ocupado / Reservado
           </div>
-        )}
-      </main>
-
-      {/* Barra Laranja Fixa Inferior com Resumo da Seleção estilo Agendei Quadras */}
-      {selectedSlots.length > 0 && (
-        <div className="fixed bottom-0 inset-x-0 bg-[#EA580C] text-white shadow-2xl py-3.5 px-4 sm:px-8 z-50 border-t border-orange-600 animate-in slide-in-from-bottom duration-200">
-          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-            
-            {/* Texto do Agendamento */}
-            <div className="text-left w-full sm:w-auto">
-              <h3 className="text-xs sm:text-sm font-bold line-clamp-1 text-white">
-                Resumo do agendamento na {activeCourtName}
-              </h3>
-              <p className="text-[11px] sm:text-xs text-orange-100 mt-0.5">
-                {selectedSlots.length} {selectedSlots.length > 1 ? "horários selecionados" : "horário selecionado"} das {timeRangeSummary} de {currentDay.displayFull}
-              </p>
-            </div>
-
-            {/* Total e Botão Escolher Horário */}
-            <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">
-              <div className="text-right">
-                <span className="text-xs sm:text-sm font-black text-white">
-                  Valor total: R$ {finalTotal.toFixed(2).replace(".", ",")}
-                </span>
-                {discount > 0 && (
-                  <span className="block text-[10px] text-emerald-200 font-bold">
-                    (R$ {discount.toFixed(2).replace(".", ",")} de desconto aplicado!)
-                  </span>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={handleProceedToCheckout}
-                className="bg-white hover:bg-orange-50 text-orange-600 font-extrabold text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-lg transition-all hover:scale-105 active:scale-95 cursor-pointer whitespace-nowrap"
-              >
-                Escolher horário
-              </button>
-            </div>
+          <div className="ml-auto hidden sm:flex items-center gap-1.5 text-slate-500 font-medium">
+            <Info className="w-3.5 h-3.5 text-blue-500" />
+            <span>Você pode selecionar <strong>vários horários consecutivos</strong> para a mesma partida.</span>
           </div>
         </div>
+
+        {/* Lista de Quadras com Grid de Horários */}
+        <div className="space-y-8">
+          {courtsToDisplay.map((court) => {
+            const slots = getSlotsForCourt(court);
+
+            return (
+              <div key={court.id} className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs">
+                {/* Cabeçalho da Quadra */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4 mb-6">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-black text-slate-900">{court.name}</h3>
+                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold text-[10px] uppercase">
+                        {court.sport_type}
+                      </span>
+                      {court.is_indoor ? (
+                        <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-bold text-[10px]">
+                          Coberta
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-bold text-[10px]">
+                          Ao Ar Livre
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Piso: <strong className="text-slate-700 capitalize">{court.surface?.toLowerCase() || "areia"}</strong> • Tarifa Padrão: <strong>R$ {Number(court.default_hourly_rate).toFixed(2)}/h</strong>
+                    </p>
+                  </div>
+
+                  <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-100">
+                    Grade de 1 em 1 hora
+                  </span>
+                </div>
+
+                {/* Grid de Horários com Formatação de Intervalo Completo (Exemplo: 19:00 às 20:00 e 20:00 às 21:00) */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
+                  {slots.map((s) => {
+                    const isSelected = selectedSlots.some(
+                      item => item.courtId === court.id && item.hour === s.hour
+                    );
+
+                    return (
+                      <button
+                        key={s.hour}
+                        disabled={s.isBooked}
+                        onClick={() => toggleSlot(court, s)}
+                        className={`group relative p-3 rounded-2xl border text-left transition flex flex-col justify-between min-h-[96px] cursor-pointer ${
+                          s.isBooked
+                            ? "bg-slate-100 border-slate-200 text-slate-400 opacity-60 cursor-not-allowed"
+                            : isSelected
+                            ? "bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-500 ring-offset-2"
+                            : "bg-white hover:bg-emerald-50/50 border-slate-200 hover:border-emerald-300 text-slate-800"
+                        }`}
+                      >
+                        {/* Horário Completo em Intervalo (Ex: 07:00 às 08:00, 19:00 às 20:00, 20:00 às 21:00) */}
+                        <div className="flex items-center justify-between gap-1 w-full">
+                          <span className={`text-[11px] sm:text-xs font-extrabold tracking-tight leading-tight whitespace-nowrap ${isSelected ? "text-white" : "text-slate-900"}`}>
+                            {s.startTime} às {s.endTime}
+                          </span>
+                          {isSelected ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-200 shrink-0" />
+                          ) : s.isBooked ? (
+                            <span className="text-[9px] font-extrabold text-slate-400 uppercase shrink-0">Ocupado</span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-slate-400 group-hover:text-emerald-600 shrink-0">+</span>
+                          )}
+                        </div>
+
+                        {/* Preço e Badges */}
+                        <div className="mt-2 w-full">
+                          {s.badge && !s.isBooked && !isSelected && (
+                            <span className={`text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded block mb-1 truncate ${
+                              s.badge.includes("NOBRE") ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"
+                            }`}>
+                              {s.badge}
+                            </span>
+                          )}
+
+                          <div className="flex items-baseline gap-1">
+                            <span className={`text-xs font-black ${isSelected ? "text-white" : "text-slate-900"}`}>
+                              R$ {s.price}
+                            </span>
+                            <span className={`text-[9px] ${isSelected ? "text-emerald-200" : "text-slate-400"}`}>
+                              /1h
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </main>
+
+      {/* Barra Fixa Inferior com Resumo e Ação de Agendamento */}
+      {selectedSlots.length > 0 && (
+        <aside className="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-xl border-t border-slate-200 shadow-2xl z-50 p-4 transition-all duration-300 animate-in slide-in-from-bottom-4">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            {/* Informações da Partida Selecionada */}
+            <div className="flex items-center gap-4 w-full sm:w-auto">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black text-base shadow-md shadow-emerald-600/30 shrink-0">
+                {totalHours}h
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="font-extrabold text-slate-900 text-sm sm:text-base">
+                    {selectedSlots[0]?.courtName}
+                  </h4>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase">
+                    {bookingMode === "RECURRING" ? "Mensalista Semanal" : "Avulsa"}
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-600 font-medium mt-0.5">
+                  <strong>{selectedDate.weekday}, {selectedDate.dayNum} de {selectedDate.monthStr}</strong> • {timeRangeLabel} ({totalHours} {totalHours === 1 ? "hora" : "horas"})
+                </p>
+
+                {(multiHourDiscount > 0 || recurringDiscount > 0) && (
+                  <p className="text-[11px] text-emerald-700 font-bold flex items-center gap-1 mt-0.5">
+                    <Sparkles className="w-3 h-3 text-emerald-600" />
+                    Economia de R$ {(multiHourDiscount + recurringDiscount).toFixed(2)} aplicada!
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Total e Botão para Checkout */}
+            <div className="flex items-center justify-between sm:justify-end gap-6 w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0">
+              <div className="text-left sm:text-right">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                  Valor Total
+                </span>
+                <div className="flex items-baseline gap-1.5">
+                  {(multiHourDiscount > 0 || recurringDiscount > 0) && (
+                    <span className="text-xs text-slate-400 line-through">
+                      R$ {subtotal.toFixed(2)}
+                    </span>
+                  )}
+                  <span className="text-xl sm:text-2xl font-black text-slate-900">
+                    R$ {totalAmount.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedSlots([])}
+                  className="px-3 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-500 font-bold text-xs transition cursor-pointer"
+                >
+                  Limpar
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleProceedToCheckout}
+                  className="px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-sm shadow-lg shadow-emerald-600/30 transition flex items-center gap-2 group active:scale-[0.98] cursor-pointer"
+                >
+                  <span>Continuar para Pagamento</span>
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </aside>
       )}
     </div>
   );
@@ -656,8 +779,8 @@ function ScheduleContent() {
 export default function SchedulePage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
-        <div className="w-8 h-8 border-3 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="w-8 h-8 rounded-full border-2 border-emerald-600 border-t-transparent animate-spin"></div>
       </div>
     }>
       <ScheduleContent />

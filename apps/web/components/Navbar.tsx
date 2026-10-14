@@ -53,15 +53,10 @@ export default function Navbar() {
     return null;
   }
 
-  // Nas telas do portal do jogador (Marketplace, Schedule, Checkout, Player), exibe apenas a barra discreta superior de alternância SaaS
-  const isMarketplaceRoute = 
-    pathname === "/" || 
-    pathname.startsWith("/schedule") || 
-    pathname.startsWith("/checkout") || 
-    pathname.startsWith("/player") ||
-    pathname.startsWith("/centro-esportivo");
+  // Na tela de checkout, exibe a barra discreta superior
+  const isMinimalRoute = pathname.startsWith("/checkout");
 
-  if (isMarketplaceRoute) {
+  if (isMinimalRoute) {
     return (
       <div className="bg-slate-950 text-slate-300 text-[11px] py-1 px-4 border-b border-slate-800/80 z-50 relative flex items-center justify-between">
         <div className="flex items-center gap-2">
