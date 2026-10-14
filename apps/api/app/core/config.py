@@ -1,5 +1,6 @@
+import os
 from typing import List, Union
-from pydantic import AnyHttpUrl, field_validator
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,17 +9,21 @@ class Settings(BaseSettings):
     SLOGAN: str = "Sua próxima partida a um clique."
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
-    ENVIRONMENT: str = "development"
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
 
-    SECRET_KEY: str = "arenago_super_jwt_secret_key_change_in_production"
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "arenago_super_jwt_secret_key_change_in_production")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 horas
 
     # Conexão Banco: Suporta PostgreSQL (asyncpg) ou SQLite (aiosqlite)
-    DATABASE_URL: str = "sqlite+aiosqlite:///./arenago.db"
+    # No Vercel serverless, apenas o diretório /tmp tem permissão de escrita
+    DATABASE_URL: str = os.getenv(
+        "DATABASE_URL",
+        "sqlite+aiosqlite:////tmp/arenago.db" if os.getenv("VERCEL") else "sqlite+aiosqlite:///./arenago.db"
+    )
 
     # Conexão Redis
-    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
     # CORS
     CORS_ORIGINS: Union[str, List[str]] = [
@@ -27,6 +32,7 @@ class Settings(BaseSettings):
         "http://localhost:3001",
         "http://127.0.0.1:3001",
         "http://localhost:8000",
+        "https://*.vercel.app",
     ]
 
     @field_validator("CORS_ORIGINS", mode="before")
