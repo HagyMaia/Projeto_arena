@@ -214,7 +214,7 @@ export default function SuperAdminPage() {
               </div>
             </div>
             <p className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              R$ {(metrics?.monthly_recurring_revenue ?? 124580).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              R$ {Number(metrics?.monthly_recurring_revenue ?? 124580).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
             </p>
             <div className="flex items-center gap-1.5 mt-2 text-xs font-bold text-emerald-600">
               <ArrowUpRight className="w-4 h-4" />
@@ -231,7 +231,7 @@ export default function SuperAdminPage() {
               </div>
             </div>
             <p className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              {(metrics?.active_subscriptions ?? 1089).toLocaleString("pt-BR")}
+              {Number(metrics?.active_subscriptions ?? 1089).toLocaleString("pt-BR")}
             </p>
             <div className="flex items-center gap-1.5 mt-2 text-xs text-slate-500">
               <span className="font-bold text-slate-700">92.4%</span> da base total convertida
@@ -247,7 +247,7 @@ export default function SuperAdminPage() {
               </div>
             </div>
             <p className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              {(metrics?.total_subscriptions ?? 1247).toLocaleString("pt-BR")}
+              {Number(metrics?.total_subscriptions ?? 1247).toLocaleString("pt-BR")}
             </p>
             <div className="flex items-center gap-1.5 mt-2 text-xs font-bold text-emerald-600">
               <ArrowUpRight className="w-4 h-4" />
@@ -395,7 +395,7 @@ export default function SuperAdminPage() {
                         </td>
 
                         <td className="px-6 py-4 text-right font-black text-slate-900 font-mono">
-                          R$ {sub.mrr_amount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                          R$ {Number(sub.mrr_amount || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                         </td>
 
                         <td className="px-6 py-4 text-center">

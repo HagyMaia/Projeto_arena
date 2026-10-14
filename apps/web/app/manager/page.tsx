@@ -223,7 +223,7 @@ export default function ManagerDashboardPage() {
                 <DollarSign className="w-4 h-4 text-orange-400" />
               </div>
               <p className="text-2xl font-black text-orange-400">
-                R$ {(stats?.revenue_today ?? 2450).toFixed(2)}
+                R$ {Number(stats?.revenue_today ?? 2450).toFixed(2)}
               </p>
               <span className="text-[10px] text-slate-400">Total confirmado</span>
             </div>
@@ -400,14 +400,14 @@ export default function ManagerDashboardPage() {
                                 <div>
                                   <p className="font-bold text-slate-900 line-clamp-1">{slot.customer_name || "Cliente Balcão"}</p>
                                   <p className="text-[11px] text-orange-800 font-medium mt-0.5">
-                                    {slot.booking_type === "ONLINE_SINGLE" ? "Reserva Online (App)" : "Mensalista / Balcão"} • R$ {slot.total_amount?.toFixed(2)}
+                                    {slot.booking_type === "ONLINE_SINGLE" ? "Reserva Online (App)" : "Mensalista / Balcão"} • R$ {Number(slot.total_amount || 0).toFixed(2)}
                                   </p>
                                 </div>
                               ) : (
                                 <div>
                                   <p className="font-medium text-emerald-900">Horário Aberto para Aluguel</p>
                                   <p className="text-[11px] text-emerald-700 font-semibold mt-0.5">
-                                    Tarifa: R$ {slot.hourly_rate?.toFixed(2)}/h • Clique p/ Bloquear
+                                    Tarifa: R$ {Number(slot.hourly_rate || 0).toFixed(2)}/h • Clique p/ Bloquear
                                   </p>
                                 </div>
                               )}
@@ -459,7 +459,7 @@ export default function ManagerDashboardPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Valor Cobrado:</span>
-                  <strong className="text-emerald-700 font-bold">R$ {selectedSlotDetails.total_amount?.toFixed(2)}</strong>
+                  <strong className="text-emerald-700 font-bold">R$ {Number(selectedSlotDetails.total_amount || 0).toFixed(2)}</strong>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Status do Pagamento:</span>

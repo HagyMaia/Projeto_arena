@@ -359,7 +359,7 @@ function PlayerPortalContent() {
                 <div className="flex items-center gap-4">
                   <div className="text-right">
                     <span className="text-xs text-slate-400 block">Valor do Aluguel</span>
-                    <span className="text-2xl font-black text-emerald-400">R$ {selectedSlot.hourly_rate.toFixed(2)}</span>
+                    <span className="text-2xl font-black text-emerald-400">R$ {Number(selectedSlot.hourly_rate || 0).toFixed(2)}</span>
                   </div>
 
                   <button
@@ -472,7 +472,7 @@ function PlayerPortalContent() {
                   <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-3 sm:pt-0">
                     <div className="text-left sm:text-right">
                       <span className="text-[10px] text-slate-400 uppercase block">Total</span>
-                      <span className="text-base font-black text-slate-900">R$ {b.total_amount?.toFixed(2)}</span>
+                      <span className="text-base font-black text-slate-900">R$ {Number(b.total_amount || 0).toFixed(2)}</span>
                     </div>
 
                     {b.status !== "CANCELLED" && (

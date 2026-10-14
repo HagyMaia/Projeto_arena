@@ -164,7 +164,7 @@ export default function MarketplacePage() {
     }))
   ).filter(c => {
     if (selectedSport !== "ALL" && c.sport_type !== selectedSport) return false;
-    if (c.default_hourly_rate > maxPrice) return false;
+    if (Number(c.default_hourly_rate) > maxPrice) return false;
     return true;
   });
 
@@ -366,7 +366,7 @@ export default function MarketplacePage() {
                       <div>
                         <span className="text-[11px] text-slate-400 block font-medium">A partir de</span>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-lg font-extrabold text-slate-900">R$ {court.default_hourly_rate.toFixed(0)}</span>
+                          <span className="text-lg font-extrabold text-slate-900">R$ {Number(court.default_hourly_rate || 0).toFixed(0)}</span>
                           <span className="text-xs text-slate-500 font-medium">/hora</span>
                         </div>
                       </div>
