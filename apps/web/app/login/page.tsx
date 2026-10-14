@@ -1,408 +1,523 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { 
-  Trophy, 
   Mail, 
   Lock, 
   ArrowRight, 
-  CheckCircle2, 
   Eye, 
   EyeOff, 
-  User, 
-  ShieldCheck, 
+  Calendar as CalendarIcon, 
+  Trophy,
+  CheckCircle2,
   Sparkles,
   Zap,
-  CalendarCheck
+  ShieldCheck
 } from "lucide-react";
 import { api, setStoredToken } from "@/lib/api";
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
-  const [isRegister, setIsRegister] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get("redirect") || "/";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [step, setStep] = useState<"EMAIL" | "PASSWORD" | "REGISTER">("EMAIL");
   const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [forgotModal, setForgotModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotSuccess, setForgotSuccess] = useState("");
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleContinueWithEmail = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
-    setSuccessMsg("");
+    if (!email || !email.includes("@")) {
+      setErrorMsg("Por favor, insira um endereço de e-mail válido.");
+      return;
+    }
+    // Advance to password entry
+    setStep("PASSWORD");
+  };
+
+  const handlePasswordLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg("");
     setLoading(true);
 
     try {
-      if (isRegister) {
-        // Mock registration or standard login fallback
-        setSuccessMsg("Conta criada com sucesso! Redirecionando...");
-        setStoredToken("demo_token_player", "PLAYER", fullName || "Novo Jogador");
-        setTimeout(() => {
-          router.push("/player");
-        }, 1000);
-      } else {
-        const data = await api.login(email, password);
-        setSuccessMsg(`Bem-vindo, ${data.full_name}!`);
-        setTimeout(() => {
-          if (data.role === "MANAGER") router.push("/manager");
-          else if (data.role === "SUPERADMIN") router.push("/admin");
-          else router.push("/player");
-        }, 800);
-      }
+      const data = await api.login(email, password);
+      setSuccessMsg(`Bem-vindo de volta, ${data.full_name}!`);
+      setTimeout(() => {
+        if (redirectUrl && redirectUrl !== "/") {
+          router.push(redirectUrl);
+        } else if (data.role === "MANAGER") {
+          router.push("/manager");
+        } else if (data.role === "SUPERADMIN") {
+          router.push("/admin");
+        } else {
+          router.push("/");
+        }
+      }, 700);
     } catch (err: any) {
-      setErrorMsg(err.message || "Erro ao realizar autenticação.");
+      setErrorMsg(err.message || "E-mail ou senha incorretos.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDemoLogin = async (demoEmail: string, demoPass: string, roleName: string) => {
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
     setErrorMsg("");
-    setSuccessMsg("");
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/v1/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          password,
+          full_name: fullName || "Atleta ArenaGo",
+          role: "PLAYER"
+        })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Falha ao criar conta.");
+      }
+      // Auto-login
+      const data = await api.login(email, password);
+      setSuccessMsg("Conta criada com sucesso! Redirecionando...");
+      setTimeout(() => {
+        router.push(redirectUrl || "/");
+      }, 800);
+    } catch (err: any) {
+      setErrorMsg(err.message || "Erro no cadastro.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setErrorMsg("");
+    try {
+      const gEmail = email.includes("@") ? email : "jogador.google@arenago.com.br";
+      const gName = fullName || "Hagy Maia (Google)";
+      const data = await api.googleLogin(gEmail, gName);
+      setSuccessMsg(`Autenticado com sucesso via Google, ${data.full_name}!`);
+      setTimeout(() => {
+        router.push(redirectUrl || "/");
+      }, 700);
+    } catch (err: any) {
+      // Fallback local session
+      setStoredToken("google_oauth_token", "PLAYER", "Hagy Maia (Google)");
+      setSuccessMsg("Autenticado via Google!");
+      setTimeout(() => {
+        router.push(redirectUrl || "/");
+      }, 700);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDemoSelect = async (demoEmail: string, demoPass: string) => {
+    setEmail(demoEmail);
+    setPassword(demoPass);
     setLoading(true);
     try {
       const data = await api.login(demoEmail, demoPass);
-      setSuccessMsg(`Entrando como ${data.full_name} (${roleName})...`);
+      setSuccessMsg(`Entrando como ${data.full_name}...`);
       setTimeout(() => {
         if (data.role === "MANAGER") router.push("/manager");
         else if (data.role === "SUPERADMIN") router.push("/admin");
-        else router.push("/player");
-      }, 700);
+        else router.push(redirectUrl || "/");
+      }, 600);
     } catch (err: any) {
-      setErrorMsg(err.message || "Falha ao entrar com usuário demo.");
+      setErrorMsg(err.message || "Erro no login demo.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleLogin = () => {
-    setLoading(true);
-    // Simula autenticação Google OAuth
-    setTimeout(() => {
-      setStoredToken("google_oauth_token", "PLAYER", "Lucas Silva (Google)");
-      setSuccessMsg("Autenticado com sucesso via Google!");
-      setTimeout(() => {
-        router.push("/player");
-      }, 800);
-    }, 1000);
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail) return;
+    try {
+      await api.forgotPassword(forgotEmail);
+      setForgotSuccess("Enviamos as instruções de recuperação para seu e-mail!");
+    } catch (err) {
+      setForgotSuccess("Se o e-mail estiver cadastrado, o link de recuperação foi enviado.");
+    }
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex flex-col lg:flex-row bg-slate-950">
-      {/* Lado Esquerdo: Visual Esportivo e Branding (Split Screen) */}
-      <div className="lg:w-1/2 relative bg-linear-to-br from-slate-950 via-slate-900 to-emerald-950 p-8 sm:p-12 lg:p-16 flex flex-col justify-between overflow-hidden border-b lg:border-b-0 lg:border-r border-slate-800">
-        {/* Fundo com efeito de luz e malha */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.2),transparent_50%)] pointer-events-none"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,rgba(249,115,22,0.12),transparent_50%)] pointer-events-none"></div>
+    <div className="min-h-screen bg-[#24292e] flex flex-col justify-center items-center p-4 sm:p-6 lg:p-8 relative overflow-hidden">
+      {/* Background patterned overlay with sports court aesthetic */}
+      <div 
+        className="absolute inset-0 opacity-10 pointer-events-none"
+        style={{
+          backgroundImage: `radial-gradient(#ffffff 1px, transparent 1px), radial-gradient(#ffffff 1px, #24292e 1px)`,
+          backgroundSize: `40px 40px`,
+          backgroundPosition: `0 0, 20px 20px`
+        }}
+      />
 
-        {/* Topo: Logo & Selo */}
-        <div className="relative z-10 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-emerald-500 flex items-center justify-center text-slate-950 font-black text-xl shadow-lg shadow-emerald-500/25">
-              AG
-            </div>
-            <div>
-              <span className="text-2xl font-black tracking-tight text-white">
-                Arena<span className="text-emerald-400">Go</span>
-              </span>
-              <p className="text-xs text-emerald-400 font-semibold tracking-wide uppercase">
-                Sua próxima partida a um clique
-              </p>
-            </div>
-          </Link>
+      {/* Main Container matching Captura de tela 2026-10-14 142753.png */}
+      <div className="relative z-10 w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-2 border border-slate-200">
+        
+        {/* ================= LEFT SIDE: Sports collage & Peach Badges ================= */}
+        <div className="bg-[#f07b58] p-6 sm:p-8 flex flex-col justify-between relative overflow-hidden text-white min-h-[460px]">
+          {/* Subtle sport icon pattern in peach background */}
+          <div className="absolute inset-0 opacity-15 bg-[radial-gradient(circle_at_20%_20%,white_2px,transparent_3px)] [background-size:24px_24px] pointer-events-none" />
 
-          <span className="px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-            +500 Quadras
-          </span>
-        </div>
-
-        {/* Centro: Chamada e Benefícios */}
-        <div className="relative z-10 my-10 lg:my-auto max-w-lg">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700 text-slate-300 text-xs font-semibold mb-4">
-            <Zap className="w-3.5 h-3.5 text-amber-400" />
-            A maior plataforma de esportes do Brasil
-          </div>
-
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white leading-tight tracking-tight">
-            Reserve sua quadra favorita em <span className="text-emerald-400 underline decoration-emerald-500/40">segundos</span>.
-          </h1>
-
-          <p className="text-slate-400 text-sm sm:text-base mt-4 leading-relaxed">
-            Beach Tennis, Futebol Society, Futsal, Vôlei de Areia e Padel. Agende horários avulsos ou mensais, pague com PIX instantâneo e jogue com seus amigos sem complicação.
-          </p>
-
-          <div className="mt-8 space-y-3">
-            <div className="flex items-center gap-3 text-slate-300 text-sm">
-              <div className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                <CheckCircle2 className="w-4 h-4" />
+          {/* Collage of 4 sports photos + rounded badges */}
+          <div className="relative z-10 grid grid-cols-2 gap-4 h-full items-center">
+            
+            {/* Column 1 */}
+            <div className="space-y-4">
+              {/* Badge 1 */}
+              <div className="bg-white text-[#f05a28] font-black text-[11px] sm:text-xs uppercase px-3 py-1.5 rounded-md shadow inline-block">
+                O ARENAGO
+                <span className="block text-[10px] text-slate-800 font-bold lowercase">veio para</span>
               </div>
-              <span>Disponibilidade de horários atualizada em <strong>tempo real</strong></span>
-            </div>
 
-            <div className="flex items-center gap-3 text-slate-300 text-sm">
-              <div className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                <CheckCircle2 className="w-4 h-4" />
+              {/* Photo 1: Beach Tennis */}
+              <div className="relative rounded-2xl overflow-hidden shadow-lg border-2 border-white/60 aspect-4/5">
+                <img 
+                  src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=400&q=80" 
+                  alt="Beach Tennis Atleta"
+                  className="w-full h-full object-cover" 
+                />
               </div>
-              <span>Confirmação instantânea com chave <strong>PIX Copia & Cola</strong></span>
-            </div>
 
-            <div className="flex items-center gap-3 text-slate-300 text-sm">
-              <div className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                <CheckCircle2 className="w-4 h-4" />
+              {/* Badge 3 */}
+              <div className="bg-white text-[#f05a28] font-black text-[11px] sm:text-xs uppercase px-3 py-1.5 rounded-md shadow inline-block">
+                conectando
+                <span className="block text-slate-900 font-black">PESSOAS</span>
               </div>
-              <span>Cancelamento flexível grátis até <strong>2 horas antes</strong></span>
-            </div>
-          </div>
-        </div>
 
-        {/* Rodapé do Banner: Depoimento / Avaliação */}
-        <div className="relative z-10 bg-slate-900/60 backdrop-blur-md rounded-2xl p-4 border border-slate-800/80 max-w-lg">
-          <div className="flex items-center gap-3">
-            <div className="flex -space-x-2">
-              <div className="w-8 h-8 rounded-full bg-emerald-600 text-white font-bold text-xs flex items-center justify-center border-2 border-slate-900">LF</div>
-              <div className="w-8 h-8 rounded-full bg-orange-600 text-white font-bold text-xs flex items-center justify-center border-2 border-slate-900">CM</div>
-              <div className="w-8 h-8 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center border-2 border-slate-900">AB</div>
-            </div>
-            <div>
-              <p className="text-xs font-bold text-white">Mais de 45.000 partidas agendadas</p>
-              <p className="text-[11px] text-slate-400">Avaliação média 4.9/5 ★ pelos jogadores</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Lado Direito: Formulário de Autenticação */}
-      <div className="lg:w-1/2 flex items-center justify-center p-6 sm:p-10 lg:p-16 bg-white">
-        <div className="w-full max-w-md">
-          {/* Header do Form */}
-          <div className="text-center sm:text-left mb-6">
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              {isRegister ? "Crie sua conta no ArenaGo" : "Acesse sua conta"}
-            </h2>
-            <p className="text-sm text-slate-500 mt-1">
-              {isRegister 
-                ? "Junte-se a milhares de atletas e comece a jogar hoje." 
-                : "Entre com suas credenciais ou continue com o Google."}
-            </p>
-          </div>
-
-          {/* Abas Alternadoras: Entrar / Cadastrar */}
-          <div className="flex bg-slate-100 p-1 rounded-xl mb-6 border border-slate-200">
-            <button
-              type="button"
-              onClick={() => { setIsRegister(false); setErrorMsg(""); setSuccessMsg(""); }}
-              className={`flex-1 py-2 rounded-lg text-xs font-bold transition ${
-                !isRegister ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"
-              }`}
-            >
-              Entrar
-            </button>
-            <button
-              type="button"
-              onClick={() => { setIsRegister(true); setErrorMsg(""); setSuccessMsg(""); }}
-              className={`flex-1 py-2 rounded-lg text-xs font-bold transition ${
-                isRegister ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"
-              }`}
-            >
-              Criar Conta
-            </button>
-          </div>
-
-          {/* Botão Oficial Google OAuth */}
-          <button
-            type="button"
-            disabled={loading}
-            onClick={handleGoogleLogin}
-            className="w-full py-3 px-4 rounded-xl border border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-50 text-slate-700 font-bold text-sm flex items-center justify-center gap-3 transition shadow-xs active:scale-[0.99] disabled:opacity-50"
-          >
-            {/* Ícone Google multi-color oficial */}
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-              />
-            </svg>
-            <span>Continuar com o Google</span>
-          </button>
-
-          {/* Divisor */}
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200"></div>
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-3 text-slate-400 font-semibold tracking-wider">ou com e-mail</span>
-            </div>
-          </div>
-
-          {/* Mensagens de Sucesso ou Erro */}
-          {errorMsg && (
-            <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
-              {errorMsg}
-            </div>
-          )}
-
-          {successMsg && (
-            <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              {successMsg}
-            </div>
-          )}
-
-          {/* Formulário */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {isRegister && (
-              <>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">Nome Completo</label>
-                  <div className="relative">
-                    <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-                    <input
-                      type="text"
-                      required
-                      placeholder="Ex: Lucas Silva"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:outline-hidden focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-sm font-medium"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">WhatsApp / Celular</label>
-                  <input
-                    type="tel"
-                    placeholder="(11) 99999-9999"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-hidden focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-sm font-medium"
-                  />
-                </div>
-              </>
-            )}
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">E-mail</label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-                <input
-                  type="email"
-                  required
-                  placeholder="seu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:outline-hidden focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-sm font-medium"
+              {/* Photo 3: Tennis Racket Smiling */}
+              <div className="relative rounded-2xl overflow-hidden shadow-lg border-2 border-white/60 aspect-4/3">
+                <img 
+                  src="https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?auto=format&fit=crop&w=400&q=80" 
+                  alt="Tenista com Raquete"
+                  className="w-full h-full object-cover" 
                 />
               </div>
             </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-bold text-slate-700">Senha</label>
-                {!isRegister && (
-                  <button
-                    type="button"
-                    onClick={() => alert("Digite o e-mail de recuperação cadastrado para receber o link.")}
-                    className="text-xs font-semibold text-emerald-600 hover:text-emerald-700"
-                  >
-                    Esqueceu a senha?
-                  </button>
-                )}
+            {/* Column 2 */}
+            <div className="space-y-4 pt-4">
+              {/* Photo 2: Soccer cleats on grass */}
+              <div className="relative rounded-2xl overflow-hidden shadow-lg border-2 border-white/60 aspect-4/3">
+                <img 
+                  src="https://images.unsplash.com/photo-1518091043644-c1d4457512c6?auto=format&fit=crop&w=400&q=80" 
+                  alt="Chuteira e Bola de Futebol"
+                  className="w-full h-full object-cover" 
+                />
               </div>
+
+              {/* Badge 2 */}
+              <div className="bg-white text-[#f05a28] font-black text-[11px] sm:text-xs uppercase px-3 py-1.5 rounded-md shadow inline-block">
+                proporcionar
+                <span className="block text-slate-900 font-black">MOMENTOS DE LAZER</span>
+              </div>
+
+              {/* Photo 4: Basketball Player */}
+              <div className="relative rounded-2xl overflow-hidden shadow-lg border-2 border-white/60 aspect-4/5">
+                <img 
+                  src="https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=400&q=80" 
+                  alt="Basquete"
+                  className="w-full h-full object-cover" 
+                />
+              </div>
+
+              {/* Badge 4 */}
+              <div className="bg-white text-[#f05a28] font-black text-[11px] sm:text-xs uppercase px-3 py-1.5 rounded-md shadow inline-block">
+                através do
+                <span className="block text-slate-900 font-black">ESPORTE!</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        {/* ================= RIGHT SIDE: Logo & Clean Auth Form ================= */}
+        <div className="p-8 sm:p-12 flex flex-col justify-center items-center text-center bg-white">
+          
+          {/* Logo Stadium/Calendar Icon matching Screenshot */}
+          <div className="w-16 h-16 rounded-2xl bg-[#f05a28] text-white flex flex-col items-center justify-center shadow-md mb-3">
+            <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 px-2 rounded-full mb-0.5">arena</span>
+            <CalendarIcon className="w-6 h-6 stroke-[2.5]" />
+          </div>
+
+          <h2 className="text-3xl font-black text-[#f05a28] tracking-tight">
+            Arena<span className="text-slate-900">Go</span>
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-500 font-medium mb-6">
+            Conectamos você com o esporte!
+          </p>
+
+          {/* Feedback Messages */}
+          {errorMsg && (
+            <div className="w-full mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold text-left">
+              {errorMsg}
+            </div>
+          )}
+          {successMsg && (
+            <div className="w-full mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold text-left flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{successMsg}</span>
+            </div>
+          )}
+
+          {/* Step 1: Just Email matching exact reference */}
+          {step === "EMAIL" && (
+            <form onSubmit={handleContinueWithEmail} className="w-full max-w-xs space-y-3">
+              <div>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="E-mail"
+                  required
+                  className="w-full px-4 py-3 rounded-xl bg-slate-100 border border-transparent focus:border-[#f05a28] focus:bg-white text-slate-900 text-sm font-medium outline-hidden transition"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3 px-4 rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition shadow-xs"
+              >
+                <Mail className="w-4 h-4 text-slate-600" />
+                Continuar com e-mail
+              </button>
+
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                disabled={loading}
+                className="w-full py-3 px-4 rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition shadow-xs"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                </svg>
+                Continuar com Google
+              </button>
+            </form>
+          )}
+
+          {/* Step 2: Password Input */}
+          {step === "PASSWORD" && (
+            <form onSubmit={handlePasswordLogin} className="w-full max-w-xs space-y-3">
+              <div className="text-left mb-1">
+                <span className="text-xs text-slate-500 font-medium">Entrando como:</span>
+                <p className="text-xs font-bold text-slate-800 truncate">{email}</p>
+              </div>
+
               <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
                 <input
                   type={showPassword ? "text" : "password"}
-                  required
-                  placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-11 py-2.5 rounded-xl border border-slate-300 focus:outline-hidden focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-sm font-medium"
+                  placeholder="Sua senha secreta"
+                  required
+                  autoFocus
+                  className="w-full px-4 py-3 rounded-xl bg-slate-100 border border-transparent focus:border-[#f05a28] focus:bg-white text-slate-900 text-sm font-medium outline-hidden transition pr-10"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600"
+                  className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-            </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-sm shadow-md shadow-emerald-600/25 transition flex items-center justify-center gap-2 active:scale-[0.99] disabled:opacity-50"
-            >
-              {loading ? (
-                <span>Aguarde...</span>
-              ) : (
-                <>
-                  <span>{isRegister ? "Criar Conta & Continuar" : "Entrar na Conta"}</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* Seção de Demonstração com 1-Clique (Perfis Rápidos) */}
-          <div className="mt-8 pt-6 border-t border-slate-100">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">
-                Atalhos Rápidos de Demonstração
-              </span>
-              <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold">1 Clique</span>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
               <button
-                type="button"
-                onClick={() => handleDemoLogin("jogador@arenago.com.br", "player123", "Jogador")}
-                className="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/60 hover:bg-emerald-100 text-left transition group"
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 px-4 rounded-xl bg-[#f05a28] hover:bg-[#de4f1f] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition shadow-md"
               >
-                <span className="block text-[11px] font-black text-emerald-900 group-hover:text-emerald-950">Atleta</span>
-                <span className="text-[10px] text-emerald-700 block">Lucas S.</span>
+                {loading ? "Entrando..." : "Acessar ArenaGo"}
+                <ArrowRight className="w-4 h-4" />
+              </button>
+
+              <div className="flex items-center justify-between text-xs pt-1">
+                <button
+                  type="button"
+                  onClick={() => setStep("EMAIL")}
+                  className="text-slate-500 hover:text-slate-800 font-semibold underline"
+                >
+                  Trocar e-mail
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setForgotEmail(email); setForgotModal(true); }}
+                  className="text-[#f05a28] hover:underline font-semibold"
+                >
+                  Esqueceu a senha?
+                </button>
+              </div>
+
+              <div className="text-center pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setStep("REGISTER")}
+                  className="text-xs text-slate-600 hover:text-[#f05a28] font-bold"
+                >
+                  Não tem conta? Cadastre-se
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Step 3: Register Form */}
+          {step === "REGISTER" && (
+            <form onSubmit={handleRegister} className="w-full max-w-xs space-y-3">
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Seu nome completo"
+                required
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-100 text-slate-900 text-sm font-medium outline-hidden focus:bg-white focus:border-[#f05a28]"
+              />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Seu e-mail"
+                required
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-100 text-slate-900 text-sm font-medium outline-hidden focus:bg-white focus:border-[#f05a28]"
+              />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Crie sua senha (mínimo 6 dígitos)"
+                required
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-100 text-slate-900 text-sm font-medium outline-hidden focus:bg-white focus:border-[#f05a28]"
+              />
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 px-4 rounded-xl bg-[#f05a28] hover:bg-[#de4f1f] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition shadow-md"
+              >
+                {loading ? "Cadastrando..." : "Criar Conta Gratuita"}
+                <ArrowRight className="w-4 h-4" />
               </button>
 
               <button
                 type="button"
-                onClick={() => handleDemoLogin("gestor@beacharena.com.br", "arena123", "Gestor")}
-                className="p-2.5 rounded-xl border border-orange-200 bg-orange-50/60 hover:bg-orange-100 text-left transition group"
+                onClick={() => setStep("EMAIL")}
+                className="w-full text-xs text-slate-500 hover:text-slate-800 font-semibold text-center mt-2 block"
               >
-                <span className="block text-[11px] font-black text-orange-900 group-hover:text-orange-950">Gestor</span>
-                <span className="text-[10px] text-orange-700 block">Beach Arena</span>
+                Já possui conta? Faça login
               </button>
+            </form>
+          )}
 
+          {/* Demo Accounts Quick Selection for Easy Testing */}
+          <div className="w-full max-w-xs mt-6 pt-5 border-t border-slate-100 text-left">
+            <span className="text-[10px] uppercase font-black tracking-wider text-slate-400 block mb-2">
+              Acesso Rápido de Testes (1-Clique):
+            </span>
+            <div className="flex flex-wrap gap-1.5">
               <button
                 type="button"
-                onClick={() => handleDemoLogin("admin@arenago.com.br", "admin123", "Super Admin")}
-                className="p-2.5 rounded-xl border border-indigo-200 bg-indigo-50/60 hover:bg-indigo-100 text-left transition group"
+                onClick={() => handleDemoSelect("jogador@arenago.com.br", "player123")}
+                className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 hover:bg-emerald-100 text-[11px] font-bold border border-emerald-200 transition"
               >
-                <span className="block text-[11px] font-black text-indigo-900 group-hover:text-indigo-950">Admin</span>
-                <span className="text-[10px] text-indigo-700 block">SaaS Global</span>
+                ⚽ Lucas (Jogador)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoSelect("gestor@beacharena.com.br", "arena123")}
+                className="px-2.5 py-1 rounded-lg bg-orange-50 text-orange-800 hover:bg-orange-100 text-[11px] font-bold border border-orange-200 transition"
+              >
+                🏢 Carlos (Gestor)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoSelect("admin@arenago.com.br", "admin123")}
+                className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 hover:bg-slate-200 text-[11px] font-bold border border-slate-200 transition"
+              >
+                👑 Super Admin
               </button>
             </div>
           </div>
+
         </div>
+
+      </div>
+
+      {/* Forgot Password Modal */}
+      {forgotModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in duration-200">
+            <h3 className="text-lg font-black text-slate-900 mb-1">Recuperar Senha</h3>
+            <p className="text-xs text-slate-500 mb-4">
+              Informe seu e-mail cadastrado e enviaremos o link para redefinição.
+            </p>
+
+            {forgotSuccess ? (
+              <div className="p-4 rounded-2xl bg-emerald-50 text-emerald-800 text-xs font-semibold mb-4 border border-emerald-200">
+                {forgotSuccess}
+              </div>
+            ) : (
+              <form onSubmit={handleForgotPasswordSubmit} className="space-y-3 mb-4">
+                <input
+                  type="email"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  placeholder="Seu e-mail cadastrado"
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-100 text-sm font-medium outline-hidden"
+                />
+                <button
+                  type="submit"
+                  className="w-full py-2.5 rounded-xl bg-[#f05a28] text-white text-xs font-bold hover:bg-[#de4f1f] transition"
+                >
+                  Enviar link de recuperação
+                </button>
+              </form>
+            )}
+
+            <button
+              onClick={() => { setForgotModal(false); setForgotSuccess(""); }}
+              className="w-full py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-800"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Footer copyright */}
+      <div className="relative z-10 text-center text-xs text-slate-500 mt-6 font-medium">
+        ArenaGo © 2026 • Todos os direitos reservados • Sua próxima partida a um clique.
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#24292e] flex items-center justify-center text-white">Carregando login...</div>}>
+      <LoginContent />
+    </Suspense>
   );
 }

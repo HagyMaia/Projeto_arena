@@ -65,19 +65,20 @@ async def get_manager_timeline(
                 .where(
                     Booking.court_id == court.id,
                     Booking.status.in_(["PENDING", "CONFIRMED"]),
-                    Booking.start_time >= day_start,
-                    Booking.start_time <= day_end
+                    Booking.start_time <= day_end,
+                    Booking.end_time >= day_start
                 )
                 .options(selectinload(Booking.user))
             )
             bookings = bookings_res.scalars().all()
-            bookings_by_hour = {b.start_time.hour: b for b in bookings}
 
             slots = []
             for hour in range(7, 23):
                 slot_time = f"{hour:02d}:00"
                 slot_end = f"{(hour+1):02d}:00"
-                booking = bookings_by_hour.get(hour)
+                slot_dt_start = datetime.combine(target_date, time(hour, 0), tzinfo=timezone.utc)
+                slot_dt_end = datetime.combine(target_date, time(hour + 1, 0), tzinfo=timezone.utc)
+                booking = next((b for b in bookings if b.start_time < slot_dt_end and b.end_time > slot_dt_start), None)
 
                 if booking:
                     slots.append({

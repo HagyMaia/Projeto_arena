@@ -10,7 +10,13 @@ from app.core.database import get_db
 from app.models.booking import Booking
 from app.models.venue import Court, OperatingHour, Venue
 from app.schemas.booking import SlotAvailability
-from app.schemas.venue import CourtResponse, VenueResponse
+from app.schemas.venue import (
+    CourtResponse,
+    CourtSchedule,
+    CourtScheduleSlot,
+    VenueResponse,
+    VenueScheduleResponse,
+)
 
 router = APIRouter(prefix="/venues", tags=["Marketplace de Arenas & Quadras"])
 
@@ -34,7 +40,6 @@ async def list_venues(
     result = await db.execute(query)
     venues = result.scalars().all()
 
-    # Filtros em nível de quadra se especificados
     filtered_venues = []
     for v in venues:
         matched_courts = []
@@ -61,6 +66,135 @@ async def list_venues(
     return filtered_venues
 
 
+@router.get("/{id_or_slug}/schedule", response_model=VenueScheduleResponse)
+async def get_venue_schedule(
+    id_or_slug: str,
+    target_date: Optional[date] = Query(None, description="Data no formato AAAA-MM-DD (padrão hoje)"),
+    date: Optional[date] = Query(None, description="Alias para target_date"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Retorna a grade horária completa da arena e de todas as suas quadras
+    para a data informada, sincronizada em tempo real com o banco de dados.
+    """
+    target_date = target_date or date or datetime.now(timezone.utc).date()
+
+    query = select(Venue).where(
+        (Venue.id == id_or_slug) | (Venue.slug == id_or_slug)
+    ).options(selectinload(Venue.courts))
+    
+    result = await db.execute(query)
+    venue = result.scalar_one_or_none()
+    if not venue:
+        raise HTTPException(status_code=404, detail="Arena não encontrada.")
+
+    day_start = datetime.combine(target_date, time(0, 0), tzinfo=timezone.utc)
+    day_end = datetime.combine(target_date, time(23, 59, 59), tzinfo=timezone.utc)
+
+    # Buscar reservas ativas de todas as quadras da arena para o dia
+    court_ids = [c.id for c in venue.courts if c.is_active]
+    bookings_res = await db.execute(
+        select(Booking).where(
+            Booking.court_id.in_(court_ids),
+            Booking.status.in_(["PENDING", "CONFIRMED"]),
+            Booking.start_time <= day_end,
+            Booking.end_time >= day_start
+        )
+    )
+    all_bookings = bookings_res.scalars().all()
+
+    courts_schedule = []
+    address_str = f"{venue.address_street}, n. {venue.address_number}, {venue.neighborhood}, {venue.city} - {venue.state}"
+
+    court_images = {
+        "FOOTBALL": "https://images.unsplash.com/photo-1529900248673-982855519db1?auto=format&fit=crop&w=600&q=80",
+        "BEACH_TENNIS": "https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?auto=format&fit=crop&w=600&q=80",
+        "VOLLEYBALL": "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=600&q=80",
+        "FUTSAL": "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=600&q=80",
+    }
+
+    for court in venue.courts:
+        if not court.is_active:
+            continue
+
+        court_bookings = [b for b in all_bookings if b.court_id == court.id]
+
+        slots = []
+        base_rate = court.default_hourly_rate
+
+        for hour in range(7, 24):
+            slot_start = datetime.combine(target_date, time(hour, 0), tzinfo=timezone.utc)
+            # Lida com virada da meia-noite se for 23h
+            if hour == 23:
+                next_day = target_date + timedelta(days=1)
+                slot_end = datetime.combine(next_day, time(0, 0), tzinfo=timezone.utc)
+                time_label = "23:00 às 00:00"
+            else:
+                slot_end = datetime.combine(target_date, time(hour + 1, 0), tzinfo=timezone.utc)
+                time_label = f"{hour:02d}:00 às {(hour + 1):02d}:00"
+
+            # Checagem real de sobreposição de intervalo
+            is_booked = any(b.start_time < slot_end and b.end_time > slot_start for b in court_bookings)
+
+            # Dinâmica de preços e badges inspirada na referência Agendei Quadras
+            current_rate = base_rate
+            original_rate = base_rate
+            badge = None
+            has_discount = False
+
+            if 18 <= hour <= 21:
+                badge = "🔥"
+            elif hour < 12:
+                # Promoção diurna
+                current_rate = round(base_rate * Decimal("0.85"), 2)
+                has_discount = True
+                badge = "%"
+
+            slots.append(
+                CourtScheduleSlot(
+                    hour=hour,
+                    start_time=slot_start,
+                    end_time=slot_end,
+                    time_label=time_label,
+                    is_available=not is_booked,
+                    is_booked=is_booked,
+                    hourly_rate=current_rate,
+                    original_rate=original_rate,
+                    badge=badge,
+                    has_discount=has_discount
+                )
+            )
+
+        courts_schedule.append(
+            CourtSchedule(
+                court_id=court.id,
+                court_name=court.name,
+                sport_type=court.sport_type,
+                surface=court.surface,
+                is_indoor=court.is_indoor,
+                default_hourly_rate=court.default_hourly_rate,
+                image_url=court_images.get(court.sport_type, "https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?auto=format&fit=crop&w=600&q=80"),
+                address=address_str,
+                promo_badge="R$ 10,00 de desconto a cada 2h",
+                promo_subtext="Válido das 18:00 às 21:00 ao selecionar no mínimo 2h",
+                slots=slots
+            )
+        )
+
+    return VenueScheduleResponse(
+        venue_id=venue.id,
+        venue_name=venue.name,
+        venue_slug=venue.slug,
+        address_full=address_str,
+        city=venue.city,
+        state=venue.state,
+        rating_average=venue.rating_average,
+        rating_count=venue.rating_count,
+        target_date=target_date.isoformat(),
+        courts=courts_schedule
+    )
+
+
 @router.get("/{id_or_slug}", response_model=VenueResponse)
 async def get_venue(id_or_slug: str, db: AsyncSession = Depends(get_db)):
     query = select(Venue).where(
@@ -78,39 +212,34 @@ async def get_venue(id_or_slug: str, db: AsyncSession = Depends(get_db)):
 async def get_court_slots(
     court_id: str,
     target_date: Optional[date] = Query(None, description="Data no formato AAAA-MM-DD (padrão hoje)"),
+    date: Optional[date] = Query(None, description="Alias para target_date"),
     db: AsyncSession = Depends(get_db)
 ):
-    if not target_date:
-        target_date = datetime.now(timezone.utc).date()
+    target_date = target_date or date or datetime.now(timezone.utc).date()
 
-    # Buscar quadra
     court_res = await db.execute(select(Court).where(Court.id == court_id, Court.is_active.is_(True)))
     court = court_res.scalar_one_or_none()
     if not court:
         raise HTTPException(status_code=404, detail="Quadra não encontrada.")
 
-    # Início e fim do dia
     day_start = datetime.combine(target_date, time(0, 0), tzinfo=timezone.utc)
     day_end = datetime.combine(target_date, time(23, 59, 59), tzinfo=timezone.utc)
 
-    # Buscar reservas ativas do dia
     bookings_res = await db.execute(
         select(Booking).where(
             Booking.court_id == court_id,
             Booking.status.in_(["PENDING", "CONFIRMED"]),
-            Booking.start_time >= day_start,
-            Booking.start_time <= day_end
+            Booking.start_time <= day_end,
+            Booking.end_time >= day_start
         )
     )
     booked_slots = bookings_res.scalars().all()
-    booked_hours = {b.start_time.hour for b in booked_slots}
 
-    # Gerar slots das 07:00 às 23:00
     slots = []
     for hour in range(7, 23):
         slot_start = datetime.combine(target_date, time(hour, 0), tzinfo=timezone.utc)
         slot_end = datetime.combine(target_date, time(hour + 1, 0), tzinfo=timezone.utc)
-        is_avail = hour not in booked_hours
+        is_avail = not any(b.start_time < slot_end and b.end_time > slot_start for b in booked_slots)
 
         slots.append(
             SlotAvailability(
@@ -122,3 +251,4 @@ async def get_court_slots(
         )
 
     return slots
+

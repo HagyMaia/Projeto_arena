@@ -174,6 +174,46 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export interface CourtScheduleSlot {
+  hour: number;
+  start_time: string;
+  end_time: string;
+  time_label: string;
+  is_available: boolean;
+  is_booked: boolean;
+  hourly_rate: number;
+  original_rate: number;
+  badge?: string | null;
+  has_discount: boolean;
+}
+
+export interface CourtSchedule {
+  court_id: string;
+  court_name: string;
+  sport_type: string;
+  surface: string;
+  is_indoor: boolean;
+  default_hourly_rate: number;
+  image_url?: string;
+  address: string;
+  promo_badge?: string;
+  promo_subtext?: string;
+  slots: CourtScheduleSlot[];
+}
+
+export interface VenueScheduleResponse {
+  venue_id: string;
+  venue_name: string;
+  venue_slug: string;
+  address_full: string;
+  city: string;
+  state: string;
+  rating_average: number;
+  rating_count: number;
+  target_date: string;
+  courts: CourtSchedule[];
+}
+
 // API Methods
 export const api = {
   // Auth
@@ -219,13 +259,34 @@ export const api = {
     return request<Venue>(`/venues/${idOrSlug}`);
   },
 
+  async getVenueSchedule(idOrSlug: string, dateStr?: string): Promise<VenueScheduleResponse> {
+    const qs = dateStr ? `?target_date=${dateStr}` : "";
+    return request<VenueScheduleResponse>(`/venues/${idOrSlug}/schedule${qs}`);
+  },
+
+  async googleLogin(email?: string, name?: string) {
+    const res = await request<any>("/auth/google", {
+      method: "POST",
+      body: JSON.stringify({ email, name }),
+    });
+    setStoredToken(res.access_token, res.role, res.full_name);
+    return res;
+  },
+
+  async forgotPassword(email: string) {
+    return request<{ message: string }>("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    });
+  },
+
   async getCourtSlots(courtId: string, dateStr?: string): Promise<SlotAvailability[]> {
     const qs = dateStr ? `?target_date=${dateStr}` : "";
     return request<SlotAvailability[]>(`/venues/courts/${courtId}/slots${qs}`);
   },
 
   // Bookings
-  async createBooking(courtId: string, startTime: string, endTime: string, bookingType: string = "ONLINE_SINGLE"): Promise<Booking> {
+  async createBooking(courtId: string, startTime: string, endTime: string, bookingType: string = "ONLINE_SINGLE", notes?: string): Promise<Booking> {
     return request<Booking>("/bookings", {
       method: "POST",
       body: JSON.stringify({
@@ -233,6 +294,7 @@ export const api = {
         start_time: startTime,
         end_time: endTime,
         booking_type: bookingType,
+        notes: notes,
       }),
     });
   },
@@ -270,3 +332,4 @@ export const api = {
     return request<AdminSubscription[]>(`/admin/subscriptions${qs}`);
   },
 };
+
