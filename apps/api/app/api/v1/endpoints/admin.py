@@ -13,11 +13,14 @@ from app.core.security import get_password_hash, require_roles
 from app.models.organization import Organization, OrganizationMember
 from app.models.subscription import Plan, Subscription
 from app.models.user import User
-from app.models.venue import Court, CourtImage, OperatingHour, Venue
+from app.models.venue import Court, CourtImage, OperatingHour, Venue, WhatsAppContact
 from app.schemas.venue import (
     CourtPricingUpdate,
     VenueWithOwnerCreate,
     VenueUpdatePayload,
+    WhatsAppContactCreate,
+    WhatsAppContactResponse,
+    WhatsAppContactUpdate,
 )
 
 router = APIRouter(prefix="/admin", tags=["Super Admin SaaS"])
@@ -483,4 +486,111 @@ async def add_court_to_venue(
         "venue_id": venue.id,
         "message": f"Quadra '{court.name}' adicionada à arena '{venue.name}' com sucesso!"
     }
+
+
+@router.get("/whatsapp-contacts", response_model=List[WhatsAppContactResponse])
+async def list_admin_whatsapp_contacts(
+    venue_id: Optional[str] = Query(None, description="Filtrar por arena específica (ou 'platform' para contatos gerais)"),
+    payload: dict = Depends(require_roles("SUPERADMIN")),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    SuperAdmin: Lista todos os números de WhatsApp cadastrados (da plataforma e de arenas).
+    """
+    query = select(WhatsAppContact).order_by(WhatsAppContact.created_at.desc())
+    if venue_id == "platform":
+        query = query.where(WhatsAppContact.venue_id.is_(None))
+    elif venue_id:
+        query = query.where(WhatsAppContact.venue_id == venue_id)
+
+    res = await db.execute(query)
+    return res.scalars().all()
+
+
+@router.post("/whatsapp-contacts", response_model=WhatsAppContactResponse, status_code=status.HTTP_201_CREATED)
+async def create_admin_whatsapp_contact(
+    data: WhatsAppContactCreate,
+    payload: dict = Depends(require_roles("SUPERADMIN")),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    SuperAdmin: Cadastra novo WhatsApp geral da plataforma (venue_id=None) ou para qualquer arena.
+    """
+    if data.is_primary:
+        stmt = select(WhatsAppContact)
+        if data.venue_id:
+            stmt = stmt.where(WhatsAppContact.venue_id == data.venue_id)
+        else:
+            stmt = stmt.where(WhatsAppContact.venue_id.is_(None))
+        res = await db.execute(stmt)
+        for c in res.scalars().all():
+            c.is_primary = False
+
+    contact = WhatsAppContact(
+        venue_id=data.venue_id,
+        department=data.department or "Atendimento",
+        label=data.label,
+        phone_number=data.phone_number,
+        custom_message=data.custom_message,
+        is_primary=data.is_primary,
+        is_active=data.is_active
+    )
+    db.add(contact)
+    await db.commit()
+    await db.refresh(contact)
+    return contact
+
+
+@router.put("/whatsapp-contacts/{contact_id}", response_model=WhatsAppContactResponse)
+async def update_admin_whatsapp_contact(
+    contact_id: str,
+    data: WhatsAppContactUpdate,
+    payload: dict = Depends(require_roles("SUPERADMIN")),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    SuperAdmin: Atualiza qualquer contato de WhatsApp.
+    """
+    res = await db.execute(select(WhatsAppContact).where(WhatsAppContact.id == contact_id))
+    contact = res.scalar_one_or_none()
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contato não encontrado.")
+
+    if data.is_primary:
+        stmt = select(WhatsAppContact).where(WhatsAppContact.id != contact.id)
+        if contact.venue_id:
+            stmt = stmt.where(WhatsAppContact.venue_id == contact.venue_id)
+        else:
+            stmt = stmt.where(WhatsAppContact.venue_id.is_(None))
+        existing = await db.execute(stmt)
+        for c in existing.scalars().all():
+            c.is_primary = False
+
+    update_dict = data.model_dump(exclude_unset=True)
+    for field, value in update_dict.items():
+        setattr(contact, field, value)
+
+    await db.commit()
+    await db.refresh(contact)
+    return contact
+
+
+@router.delete("/whatsapp-contacts/{contact_id}")
+async def delete_admin_whatsapp_contact(
+    contact_id: str,
+    payload: dict = Depends(require_roles("SUPERADMIN")),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    SuperAdmin: Remove qualquer contato de WhatsApp.
+    """
+    res = await db.execute(select(WhatsAppContact).where(WhatsAppContact.id == contact_id))
+    contact = res.scalar_one_or_none()
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contato não encontrado.")
+
+    await db.delete(contact)
+    await db.commit()
+    return {"success": True, "message": "Contato WhatsApp removido com sucesso."}
+
 

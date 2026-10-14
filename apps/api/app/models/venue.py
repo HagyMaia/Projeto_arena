@@ -36,6 +36,24 @@ class Venue(Base):
     organization = relationship("Organization", back_populates="venues")
     courts = relationship("Court", back_populates="venue", cascade="all, delete-orphan")
     operating_hours = relationship("OperatingHour", back_populates="venue", cascade="all, delete-orphan")
+    whatsapp_contacts = relationship("WhatsAppContact", back_populates="venue", cascade="all, delete-orphan")
+
+
+class WhatsAppContact(Base):
+    __tablename__ = "whatsapp_contacts"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    venue_id = Column(String(36), ForeignKey("venues.id", ondelete="CASCADE"), nullable=True, index=True)
+    department = Column(String(100), nullable=False, default="Reservas")
+    label = Column(String(100), nullable=True)
+    phone_number = Column(String(30), nullable=False)
+    custom_message = Column(Text, nullable=True)
+    is_primary = Column(Boolean, default=False, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    venue = relationship("Venue", back_populates="whatsapp_contacts")
 
 
 class Court(Base):

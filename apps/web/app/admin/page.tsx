@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { 
   TrendingUp, 
   Users, 
@@ -29,7 +30,10 @@ import {
   Sparkles,
   Layers,
   Check,
-  Eye
+  Eye,
+  MessageCircle,
+  ExternalLink,
+  Trash2
 } from "lucide-react";
 import { 
   api, 
@@ -39,8 +43,13 @@ import {
   AdminCourt,
   CreateVenueWithOwnerPayload, 
   UpdateCourtPricingPayload,
-  UpdateVenuePayload
+  UpdateVenuePayload,
+  WhatsAppContact,
+  CreateWhatsAppContactPayload,
+  UpdateWhatsAppContactPayload,
+  getStoredUser
 } from "@/lib/api";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 // High quality sports facility images for easy 1-click preview
 const PRESET_VENUE_IMAGES = [
@@ -51,13 +60,29 @@ const PRESET_VENUE_IMAGES = [
 ];
 
 export default function SuperAdminPage() {
-  const [activeTab, setActiveTab] = useState<"arenas" | "pricing" | "saas">("arenas");
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<"arenas" | "pricing" | "saas" | "whatsapp">("arenas");
   const [metrics, setMetrics] = useState<AdminMetrics | null>(null);
   const [subscriptions, setSubscriptions] = useState<AdminSubscription[]>([]);
   const [venues, setVenues] = useState<AdminVenue[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // WhatsApp Platform Contacts State
+  const [whatsappContacts, setWhatsappContacts] = useState<WhatsAppContact[]>([]);
+  const [whatsappLoading, setWhatsappLoading] = useState(false);
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+  const [editingWhatsAppContact, setEditingWhatsAppContact] = useState<WhatsAppContact | null>(null);
+  const [whatsappForm, setWhatsappForm] = useState<CreateWhatsAppContactPayload>({
+    department: "Suporte Geral",
+    label: "WhatsApp Oficial Plataforma",
+    phone_number: "",
+    custom_message: "Olá! Gostaria de suporte sobre a plataforma ArenaGo.",
+    is_primary: false,
+    is_active: true,
+    venue_id: null
+  });
 
   // Modals state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -292,13 +317,162 @@ export default function SuperAdminPage() {
     }
   };
 
+  const loadWhatsAppContacts = async () => {
+    setWhatsappLoading(true);
+    try {
+      const contacts = await api.getAdminWhatsAppContacts();
+      setWhatsappContacts(contacts);
+    } catch {
+      setWhatsappContacts([
+        {
+          id: "wa-plat-1",
+          venue_id: null,
+          department: "Suporte Oficial",
+          label: "Central ArenaGo Brasil",
+          phone_number: "(11) 98888-0000",
+          custom_message: "Olá! Gostaria de suporte sobre a plataforma ArenaGo.",
+          is_primary: true,
+          is_active: true
+        },
+        {
+          id: "wa-plat-2",
+          venue_id: null,
+          department: "Comercial & Parcerias",
+          label: "Novas Arenas SaaS",
+          phone_number: "(11) 97777-1111",
+          custom_message: "Olá! Tenho interesse em cadastrar minha arena no ArenaGo.",
+          is_primary: false,
+          is_active: true
+        }
+      ]);
+    } finally {
+      setWhatsappLoading(false);
+    }
+  };
+
   useEffect(() => {
+    // RBAC: strictly verify user role
+    const user = getStoredUser();
+    if (!user) {
+      router.push("/login?redirect=/admin");
+      return;
+    }
+    if (user.role !== "SUPERADMIN") {
+      if (user.role === "MANAGER") {
+        router.push("/manager");
+      } else {
+        router.push("/player");
+      }
+      return;
+    }
     loadData();
+    loadWhatsAppContacts();
   }, []);
 
   const showNotification = (type: "success" | "error", text: string) => {
     setFeedbackMessage({ type, text });
     setTimeout(() => setFeedbackMessage(null), 5000);
+  };
+
+  // WhatsApp Admin Handlers
+  const handleOpenAddWhatsApp = () => {
+    setEditingWhatsAppContact(null);
+    setWhatsappForm({
+      department: "Suporte Geral",
+      label: "WhatsApp Oficial Plataforma",
+      phone_number: "",
+      custom_message: "Olá! Gostaria de suporte sobre a plataforma ArenaGo.",
+      is_primary: whatsappContacts.length === 0,
+      is_active: true,
+      venue_id: null
+    });
+    setIsWhatsAppModalOpen(true);
+  };
+
+  const handleOpenEditWhatsApp = (c: WhatsAppContact) => {
+    setEditingWhatsAppContact(c);
+    setWhatsappForm({
+      department: c.department,
+      label: c.label || "",
+      phone_number: c.phone_number,
+      custom_message: c.custom_message || "",
+      is_primary: c.is_primary,
+      is_active: c.is_active,
+      venue_id: c.venue_id
+    });
+    setIsWhatsAppModalOpen(true);
+  };
+
+  const handleSaveWhatsApp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = whatsappForm.phone_number.replace(/\D/g, "");
+    if (clean.length < 10) {
+      showNotification("error", "Número de WhatsApp inválido. Digite DDD + número (ex: 11988887777).");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      if (editingWhatsAppContact) {
+        await api.updateAdminWhatsAppContact(editingWhatsAppContact.id, {
+          department: whatsappForm.department,
+          label: whatsappForm.label,
+          phone_number: whatsappForm.phone_number,
+          custom_message: whatsappForm.custom_message,
+          is_primary: whatsappForm.is_primary,
+          is_active: whatsappForm.is_active
+        });
+        showNotification("success", "Contato de WhatsApp da plataforma atualizado com sucesso!");
+      } else {
+        await api.createAdminWhatsAppContact({
+          venue_id: null,
+          department: whatsappForm.department,
+          label: whatsappForm.label,
+          phone_number: whatsappForm.phone_number,
+          custom_message: whatsappForm.custom_message,
+          is_primary: whatsappForm.is_primary,
+          is_active: whatsappForm.is_active
+        });
+        showNotification("success", "Novo contato oficial cadastrado para a plataforma!");
+      }
+      setIsWhatsAppModalOpen(false);
+      await loadWhatsAppContacts();
+    } catch (err: any) {
+      showNotification("error", `Erro: ${err.message || "Não foi possível salvar o contato."}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleToggleWhatsAppActive = async (c: WhatsAppContact) => {
+    try {
+      await api.updateAdminWhatsAppContact(c.id, { is_active: !c.is_active });
+      showNotification("success", `Contato ${!c.is_active ? "ativado" : "pausado"} com sucesso.`);
+      await loadWhatsAppContacts();
+    } catch {
+      showNotification("error", "Erro ao alterar status do contato.");
+    }
+  };
+
+  const handleSetPrimaryWhatsApp = async (c: WhatsAppContact) => {
+    try {
+      await api.updateAdminWhatsAppContact(c.id, { is_primary: true });
+      showNotification("success", "Número definido como contato principal da plataforma.");
+      await loadWhatsAppContacts();
+    } catch {
+      showNotification("error", "Erro ao definir contato principal.");
+    }
+  };
+
+  const handleDeleteWhatsApp = async (contactId: string) => {
+    if (!confirm("Tem certeza que deseja excluir este número oficial da plataforma?")) return;
+    try {
+      await api.deleteAdminWhatsAppContact(contactId);
+      showNotification("success", "Contato WhatsApp removido.");
+      await loadWhatsAppContacts();
+    } catch {
+      showNotification("error", "Erro ao excluir contato.");
+    }
   };
 
   // Handler: Create New Arena + Owner
@@ -554,12 +728,17 @@ export default function SuperAdminPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            <ThemeToggle />
+
             <button
-              onClick={() => loadData()}
+              onClick={() => {
+                loadData();
+                loadWhatsAppContacts();
+              }}
               className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition"
               title="Atualizar dados"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-emerald-400" : ""}`} />
+              <RefreshCw className={`w-4 h-4 ${loading || whatsappLoading ? "animate-spin text-emerald-400" : ""}`} />
             </button>
 
             <button
@@ -709,6 +888,18 @@ export default function SuperAdminPage() {
           >
             <Activity className="w-4 h-4" />
             Métricas SaaS & MRR
+          </button>
+
+          <button
+            onClick={() => setActiveTab("whatsapp")}
+            className={`pb-3 px-4 text-sm font-semibold flex items-center gap-2 border-b-2 transition ${
+              activeTab === "whatsapp"
+                ? "border-emerald-500 text-emerald-400"
+                : "border-transparent text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <MessageCircle className="w-4 h-4" />
+            WhatsApp Geral da Plataforma ({whatsappContacts.length})
           </button>
         </div>
 
@@ -1112,6 +1303,148 @@ export default function SuperAdminPage() {
                 </table>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* TAB 4: WHATSAPP GERAL DA PLATAFORMA */}
+        {activeTab === "whatsapp" && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  <MessageCircle className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Canais Oficiais de WhatsApp da Plataforma</h3>
+                  <p className="text-xs text-slate-400">
+                    Estes números alimentam o botão flutuante oficial no marketplace geral, home pública e suporte aos clientes.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleOpenAddWhatsApp}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-semibold text-sm shadow-lg shadow-emerald-500/20 transition transform active:scale-95"
+              >
+                <Plus className="w-4 h-4" />
+                Cadastrar WhatsApp Oficial
+              </button>
+            </div>
+
+            {/* Contacts Grid */}
+            {whatsappLoading ? (
+              <div className="py-20 text-center text-slate-400">
+                Carregando canais de WhatsApp oficiais...
+              </div>
+            ) : whatsappContacts.length === 0 ? (
+              <div className="text-center py-16 px-4 bg-slate-900/40 rounded-3xl border border-dashed border-slate-800">
+                <MessageCircle className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                <h4 className="text-base font-bold text-white">Nenhum canal cadastrado ainda</h4>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1 mb-4">
+                  Cadastre o número de suporte ou comercial da plataforma para atender usuários e gestores.
+                </p>
+                <button
+                  onClick={handleOpenAddWhatsApp}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Cadastrar Primeiro Número
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {whatsappContacts.map((c) => {
+                  const cleanPhone = c.phone_number.replace(/\D/g, "");
+                  const encodedMsg = encodeURIComponent(c.custom_message || "Olá! Gostaria de falar com o suporte ArenaGo.");
+                  const waUrl = `https://wa.me/55${cleanPhone}?text=${encodedMsg}`;
+
+                  return (
+                    <div
+                      key={c.id}
+                      className={`p-5 rounded-2xl border transition relative flex flex-col justify-between ${
+                        c.is_active
+                          ? "bg-slate-900/80 border-slate-800 hover:border-slate-700 shadow-lg"
+                          : "bg-slate-900/30 border-slate-850 opacity-60"
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-black uppercase tracking-wider">
+                            {c.department}
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            {c.is_primary && (
+                              <span className="px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 text-[9px] font-bold uppercase border border-teal-500/30">
+                                Principal
+                              </span>
+                            )}
+                            <span className={`w-2 h-2 rounded-full ${c.is_active ? "bg-emerald-400" : "bg-slate-500"}`} />
+                          </div>
+                        </div>
+
+                        <h4 className="text-base font-bold text-white">{c.label || c.department}</h4>
+                        <p className="text-xs font-mono font-bold text-emerald-400 mt-0.5">{c.phone_number}</p>
+
+                        {c.custom_message && (
+                          <div className="mt-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 text-xs text-slate-300 italic line-clamp-2">
+                            "{c.custom_message}"
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-5 pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+                        <a
+                          href={waUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-semibold transition"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>Testar wa.me</span>
+                        </a>
+
+                        <div className="flex items-center gap-1">
+                          {!c.is_primary && (
+                            <button
+                              onClick={() => handleSetPrimaryWhatsApp(c)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-teal-400 hover:bg-slate-800 transition"
+                              title="Tornar número principal"
+                            >
+                              <ShieldCheck className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleToggleWhatsAppActive(c)}
+                            className={`p-1.5 rounded-lg transition ${
+                              c.is_active 
+                                ? "text-emerald-400 hover:bg-emerald-500/10" 
+                                : "text-slate-500 hover:bg-slate-800"
+                            }`}
+                            title={c.is_active ? "Pausar canal" : "Ativar canal"}
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleOpenEditWhatsApp(c)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                            title="Editar contato"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteWhatsApp(c.id)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition"
+                            title="Excluir canal"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -1686,7 +2019,7 @@ export default function SuperAdminPage() {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-bold text-sm shadow-lg shadow-amber-500/20 transition disabled:opacity-50"
+                    className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-600/20 transition disabled:opacity-50"
                   >
                     {submitting ? "Salvando..." : "Salvar Alterações de Preço"}
                   </button>
@@ -1824,6 +2157,146 @@ export default function SuperAdminPage() {
                     className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-semibold text-sm shadow-lg shadow-emerald-500/20 transition disabled:opacity-50"
                   >
                     {submitting ? "Salvando..." : "Salvar Fotos e Dados"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL 4: CADASTRAR / EDITAR WHATSAPP OFICIAL DA PLATAFORMA */}
+        {isWhatsAppModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                    <MessageCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white">
+                      {editingWhatsAppContact ? "Editar Canal Oficial WhatsApp" : "Novo Canal de WhatsApp da Plataforma"}
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Canal de atendimento central exibido no marketplace e páginas públicas
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsWhatsAppModalOpen(false)}
+                  className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveWhatsApp} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Setor do Canal *
+                  </label>
+                  <select
+                    value={whatsappForm.department}
+                    onChange={(e) => setWhatsappForm({ ...whatsappForm, department: e.target.value })}
+                    className="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
+                    required
+                  >
+                    <option value="Suporte Geral">Suporte Geral da Plataforma</option>
+                    <option value="Comercial & Vendas">Comercial & Vendas SaaS</option>
+                    <option value="Financeiro SaaS">Financeiro & Faturamento</option>
+                    <option value="Parcerias & Torneios">Parcerias & Torneios</option>
+                    <option value="Atendimento 24h">Atendimento 24h Plantão</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Rótulo / Descrição Visível
+                  </label>
+                  <input
+                    type="text"
+                    value={whatsappForm.label}
+                    onChange={(e) => setWhatsappForm({ ...whatsappForm, label: e.target.value })}
+                    placeholder="Ex: Suporte Oficial ArenaGo Brasil"
+                    className="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Número do WhatsApp (com DDD) *
+                  </label>
+                  <input
+                    type="text"
+                    value={whatsappForm.phone_number}
+                    onChange={(e) => setWhatsappForm({ ...whatsappForm, phone_number: e.target.value })}
+                    placeholder="(11) 98765-4321 ou 11987654321"
+                    className="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
+                    required
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Será formatado automaticamente e aberto via wa.me com o código do país (+55).
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Mensagem Padrão de Abertura
+                  </label>
+                  <textarea
+                    value={whatsappForm.custom_message}
+                    onChange={(e) => setWhatsappForm({ ...whatsappForm, custom_message: e.target.value })}
+                    rows={3}
+                    placeholder="Olá! Gostaria de falar com o time de suporte da ArenaGo."
+                    className="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Esta mensagem virá pré-preenchida quando o usuário clicar no botão do WhatsApp.
+                  </p>
+                </div>
+
+                <div className="pt-2 border-t border-slate-800 space-y-3">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={whatsappForm.is_primary}
+                      onChange={(e) => setWhatsappForm({ ...whatsappForm, is_primary: e.target.checked })}
+                      className="w-4 h-4 rounded text-emerald-500 bg-slate-800 border-slate-700 focus:ring-emerald-500"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-white">Número Principal</span>
+                      <p className="text-xs text-slate-400">Canal prioritário aberto com destaque no botão flutuante</p>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={whatsappForm.is_active}
+                      onChange={(e) => setWhatsappForm({ ...whatsappForm, is_active: e.target.checked })}
+                      className="w-4 h-4 rounded text-emerald-500 bg-slate-800 border-slate-700 focus:ring-emerald-500"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-white">Canal Ativo</span>
+                      <p className="text-xs text-slate-400">Visível publicamente no marketplace e suporte</p>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-6 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setIsWhatsAppModalOpen(false)}
+                    className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold transition"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-semibold text-sm shadow-lg shadow-emerald-500/20 transition disabled:opacity-50"
+                  >
+                    {submitting ? "Salvando..." : (editingWhatsAppContact ? "Salvar Alterações" : "Cadastrar Canal")}
                   </button>
                 </div>
               </form>

@@ -22,6 +22,7 @@ import {
   Filter
 } from "lucide-react";
 import { api, Venue, Court } from "@/lib/api";
+import { FloatingWhatsApp } from "@/components/FloatingWhatsApp";
 
 // Arenas padrão para fallback e alternância rápida
 const DEFAULT_VENUES: Venue[] = [
@@ -790,6 +791,12 @@ function ScheduleContent() {
           </div>
         </aside>
       )}
+
+      {/* Botão Flutuante de WhatsApp da Arena Selecionada */}
+      <FloatingWhatsApp
+        venueIdOrSlug={selectedVenue?.slug || selectedVenue?.id}
+        venueName={selectedVenue?.name}
+      />
     </div>
   );
 }

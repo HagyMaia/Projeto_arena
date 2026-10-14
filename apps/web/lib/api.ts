@@ -197,6 +197,64 @@ export interface CreateVenueWithOwnerPayload {
   }[];
 }
 
+export interface WhatsAppContact {
+  id: string;
+  venue_id?: string | null;
+  department: string;
+  label?: string | null;
+  phone_number: string;
+  custom_message?: string | null;
+  is_primary: boolean;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateWhatsAppContactPayload {
+  venue_id?: string | null;
+  department: string;
+  label?: string;
+  phone_number: string;
+  custom_message?: string;
+  is_primary?: boolean;
+  is_active?: boolean;
+}
+
+export interface UpdateWhatsAppContactPayload {
+  department?: string;
+  label?: string;
+  phone_number?: string;
+  custom_message?: string;
+  is_primary?: boolean;
+  is_active?: boolean;
+}
+
+export interface ManagerVenue {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  phone?: string;
+  cover_image_url?: string;
+  address_street: string;
+  address_number: string;
+  neighborhood?: string;
+  city: string;
+  state: string;
+  courts: {
+    id: string;
+    name: string;
+    sport_type: string;
+    surface: string;
+    default_hourly_rate: number;
+    discount_percentage: number;
+    promo_badge?: string | null;
+    promo_subtext?: string | null;
+    is_active: boolean;
+  }[];
+  whatsapp_contacts: WhatsAppContact[];
+}
+
 export interface UpdateCourtPricingPayload {
   default_hourly_rate: number;
   discount_percentage?: number;
@@ -474,6 +532,66 @@ export const api = {
         promo_subtext: payload.promo_subtext,
         image_url: payload.image_url,
       }),
+    });
+  },
+
+  // WhatsApp Contacts
+  async getPlatformWhatsAppContacts(): Promise<WhatsAppContact[]> {
+    return request<WhatsAppContact[]>("/venues/platform/whatsapp-contacts");
+  },
+
+  async getVenueWhatsAppContacts(venueIdOrSlug: string): Promise<WhatsAppContact[]> {
+    return request<WhatsAppContact[]>(`/venues/${venueIdOrSlug}/whatsapp-contacts`);
+  },
+
+  // Manager Venues & WhatsApp
+  async getManagerVenues(): Promise<ManagerVenue[]> {
+    return request<ManagerVenue[]>("/manager/venues");
+  },
+
+  async createManagerWhatsAppContact(venueId: string, payload: CreateWhatsAppContactPayload): Promise<WhatsAppContact> {
+    return request<WhatsAppContact>(`/manager/venues/${venueId}/whatsapp-contacts`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateManagerWhatsAppContact(contactId: string, payload: UpdateWhatsAppContactPayload): Promise<WhatsAppContact> {
+    return request<WhatsAppContact>(`/manager/whatsapp-contacts/${contactId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteManagerWhatsAppContact(contactId: string): Promise<{ success: boolean; message: string }> {
+    return request<{ success: boolean; message: string }>(`/manager/whatsapp-contacts/${contactId}`, {
+      method: "DELETE",
+    });
+  },
+
+  // Admin WhatsApp
+  async getAdminWhatsAppContacts(venueId?: string): Promise<WhatsAppContact[]> {
+    const qs = venueId ? `?venue_id=${venueId}` : "";
+    return request<WhatsAppContact[]>(`/admin/whatsapp-contacts${qs}`);
+  },
+
+  async createAdminWhatsAppContact(payload: CreateWhatsAppContactPayload): Promise<WhatsAppContact> {
+    return request<WhatsAppContact>("/admin/whatsapp-contacts", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateAdminWhatsAppContact(contactId: string, payload: UpdateWhatsAppContactPayload): Promise<WhatsAppContact> {
+    return request<WhatsAppContact>(`/admin/whatsapp-contacts/${contactId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteAdminWhatsAppContact(contactId: string): Promise<{ success: boolean; message: string }> {
+    return request<{ success: boolean; message: string }>(`/admin/whatsapp-contacts/${contactId}`, {
+      method: "DELETE",
     });
   },
 };

@@ -154,3 +154,36 @@ class VenueScheduleResponse(BaseModel):
     target_date: str
     courts: List[CourtSchedule]
 
+
+class WhatsAppContactBase(BaseModel):
+    department: str = "Reservas"
+    label: Optional[str] = None
+    phone_number: str
+    custom_message: Optional[str] = None
+    is_primary: bool = False
+    is_active: bool = True
+
+
+class WhatsAppContactCreate(WhatsAppContactBase):
+    venue_id: Optional[str] = None
+
+
+class WhatsAppContactUpdate(BaseModel):
+    department: Optional[str] = None
+    label: Optional[str] = None
+    phone_number: Optional[str] = None
+    custom_message: Optional[str] = None
+    is_primary: Optional[bool] = None
+    is_active: Optional[bool] = None
+
+
+class WhatsAppContactResponse(WhatsAppContactBase):
+    id: str
+    venue_id: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+

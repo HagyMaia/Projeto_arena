@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.models.booking import Booking
-from app.models.venue import Court, OperatingHour, Venue
+from app.models.venue import Court, OperatingHour, Venue, WhatsAppContact
 from app.schemas.booking import SlotAvailability
 from app.schemas.venue import (
     CourtResponse,
@@ -16,6 +16,7 @@ from app.schemas.venue import (
     CourtScheduleSlot,
     VenueResponse,
     VenueScheduleResponse,
+    WhatsAppContactResponse,
 )
 
 router = APIRouter(prefix="/venues", tags=["Marketplace de Arenas & Quadras"])
@@ -272,4 +273,56 @@ async def get_court_slots(
         )
 
     return slots
+
+
+@router.get("/platform/whatsapp-contacts", response_model=List[WhatsAppContactResponse])
+async def get_platform_whatsapp_contacts(
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Retorna os contatos oficiais de WhatsApp da plataforma ArenaGo.
+    """
+    res = await db.execute(
+        select(WhatsAppContact)
+        .where(WhatsAppContact.venue_id.is_(None), WhatsAppContact.is_active.is_(True))
+        .order_by(WhatsAppContact.is_primary.desc(), WhatsAppContact.created_at.asc())
+    )
+    return list(res.scalars().all())
+
+
+@router.get("/{id_or_slug}/whatsapp-contacts", response_model=List[WhatsAppContactResponse])
+async def get_venue_whatsapp_contacts(
+    id_or_slug: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Retorna os contatos de WhatsApp configurados para a arena específica,
+    identificados por setor (Reservas, Atendimento, Financeiro, etc.).
+    Se a arena não tiver contato ativo, retorna o contato geral da plataforma.
+    """
+    venue_res = await db.execute(
+        select(Venue).where((Venue.id == id_or_slug) | (Venue.slug == id_or_slug))
+    )
+    venue = venue_res.scalar_one_or_none()
+
+    contacts = []
+    if venue:
+        res = await db.execute(
+            select(WhatsAppContact)
+            .where(WhatsAppContact.venue_id == venue.id, WhatsAppContact.is_active.is_(True))
+            .order_by(WhatsAppContact.is_primary.desc(), WhatsAppContact.created_at.asc())
+        )
+        contacts = list(res.scalars().all())
+
+    if not contacts:
+        # Fallback para contato geral da plataforma
+        plat_res = await db.execute(
+            select(WhatsAppContact)
+            .where(WhatsAppContact.venue_id.is_(None), WhatsAppContact.is_active.is_(True))
+            .order_by(WhatsAppContact.is_primary.desc(), WhatsAppContact.created_at.asc())
+        )
+        contacts = list(plat_res.scalars().all())
+
+    return contacts
+
 

@@ -17,101 +17,20 @@ import {
   Trophy,
   Filter,
   ArrowRight,
-  Activity
+  Activity,
+  Phone
 } from "lucide-react";
-import { api, Venue, getStoredUser, clearStoredToken } from "@/lib/api";
+import { api, Venue, getStoredUser } from "@/lib/api";
+import { FloatingWhatsApp } from "@/components/FloatingWhatsApp";
 
 export default function MarketplacePage() {
   const router = useRouter();
   const [venues, setVenues] = useState<Venue[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCity, setSelectedCity] = useState<string>("Manaus/AM");
+  const [selectedCity, setSelectedCity] = useState<string>("Todas as Cidades");
   const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<"CENTROS" | "TODAS">("CENTROS");
   const [currentUser, setCurrentUser] = useState<{ role: string; name: string } | null>(null);
-
-  // Fallback demo venues if backend is still initializing
-  const fallbackVenues: Venue[] = [
-    {
-      id: "d402f250-1148-4865-bad9-d32a9db37388",
-      name: "ARENA SHOW",
-      slug: "arena-show",
-      description: "Arena Esportiva com campo society sintético e quadras de vôlei e Praça de Alimentação...",
-      address: "Avenida Natan Xavier, n. 1.685, Novo Aleixo",
-      city: "Manaus",
-      state: "AM",
-      courts: [
-        {
-          id: "ca93dedf-cc2b-467c-b92c-c155e70caad2",
-          venue_id: "d402f250-1148-4865-bad9-d32a9db37388",
-          name: "Campo Rei Pelé - Arena Show - Campo Society 40 x 18 m de jogo.",
-          sport_type: "FOOTBALL",
-          surface: "Grama Sintética Coberta",
-          is_indoor: true,
-          default_hourly_rate: 120.0
-        },
-        {
-          id: "b4bad60d-6eb8-4f9e-bac5-beb0df4f4180",
-          venue_id: "d402f250-1148-4865-bad9-d32a9db37388",
-          name: "Quadra de Areia 1 - 8 x 16 m de jogo.",
-          sport_type: "BEACH_TENNIS",
-          surface: "Areia Especial Coberta",
-          is_indoor: true,
-          default_hourly_rate: 60.0
-        },
-        {
-          id: "7b13ce44-a331-4aa3-ab4e-f8e5b8aa2a3e",
-          venue_id: "d402f250-1148-4865-bad9-d32a9db37388",
-          name: "Quadra de Areia 2 - 8 x 16 m de jogo.",
-          sport_type: "VOLLEYBALL",
-          surface: "Areia Especial Coberta",
-          is_indoor: true,
-          default_hourly_rate: 60.0
-        }
-      ]
-    },
-    {
-      id: "71cc6b7e-12bc-4159-81bb-6546398c2ea7",
-      name: "Beach Arena Itaim",
-      slug: "beach-arena-itaim",
-      description: "Complexo esportivo premium com 3 quadras de areia climatizada, vestiários e bar lounge...",
-      address: "Rua Clodomiro Amazonas, 1200",
-      city: "São Paulo",
-      state: "SP",
-      courts: [
-        {
-          id: "1f303512-708c-425b-8462-0274b29cfa1c",
-          venue_id: "71cc6b7e-12bc-4159-81bb-6546398c2ea7",
-          name: "Quadra 1 — Beach Tennis Coberta",
-          sport_type: "BEACH_TENNIS",
-          surface: "Areia Especial Coberta",
-          is_indoor: true,
-          default_hourly_rate: 120.0
-        }
-      ]
-    },
-    {
-      id: "57f128e8-79fe-428c-be68-7815618ce134",
-      name: "Galaxy Futsal & Society Park",
-      slug: "galaxy-futsal-society",
-      description: "Centro esportivo de alto rendimento com piso de parquet profissional e grama sintética monofilamento...",
-      address: "Av. Giovanni Gronchi, 3500",
-      city: "São Paulo",
-      state: "SP",
-      courts: [
-        {
-          id: "ba915548-0f3a-46a2-9ada-aaee237eb056",
-          venue_id: "57f128e8-79fe-428c-be68-7815618ce134",
-          name: "Campo Society 1 — Grama Sintética",
-          sport_type: "FOOTBALL",
-          surface: "Grama Sintética FIFA Pro",
-          is_indoor: true,
-          default_hourly_rate: 180.0
-        }
-      ]
-    }
-  ];
 
   useEffect(() => {
     setCurrentUser(getStoredUser());
@@ -121,11 +40,9 @@ export default function MarketplacePage() {
         const data = await api.getVenues();
         if (data && data.length > 0) {
           setVenues(data);
-        } else {
-          setVenues(fallbackVenues);
         }
       } catch (err) {
-        setVenues(fallbackVenues);
+        console.error("Erro ao carregar arenas:", err);
       } finally {
         setLoading(false);
       }
@@ -133,29 +50,32 @@ export default function MarketplacePage() {
     loadVenues();
   }, []);
 
-  const cities = [
-    { label: "Manaus/AM", value: "Manaus" },
-    { label: "São Paulo/SP", value: "São Paulo" },
-    { label: "Todas as Cidades", value: "ALL" },
-  ];
+  const cities = useMemo(() => {
+    const list = new Set<string>();
+    venues.forEach((v) => {
+      if (v.city && v.state) list.add(`${v.city}/${v.state}`);
+      else if (v.city) list.add(v.city);
+    });
+    return ["Todas as Cidades", ...Array.from(list)];
+  }, [venues]);
 
-  // Filtro de arenas
+  // Filtro de arenas em tempo real
   const filteredVenues = useMemo(() => {
     return venues.filter((v) => {
-      // Filtro de cidade
       if (selectedCity !== "Todas as Cidades") {
         const cityPrefix = selectedCity.split("/")[0].toLowerCase();
         if (!v.city.toLowerCase().includes(cityPrefix)) {
           return false;
         }
       }
-      // Filtro de busca textual
       if (searchTerm.trim()) {
         const term = searchTerm.toLowerCase();
         const matchesName = v.name.toLowerCase().includes(term);
         const matchesDesc = (v.description || "").toLowerCase().includes(term);
-        const matchesAddress = v.address.toLowerCase().includes(term);
-        const matchesCourt = v.courts.some((c) => c.name.toLowerCase().includes(term) || c.sport_type.toLowerCase().includes(term));
+        const matchesAddress = (v.address || "").toLowerCase().includes(term);
+        const matchesCourt = (v.courts || []).some(
+          (c) => c.name.toLowerCase().includes(term) || c.sport_type.toLowerCase().includes(term)
+        );
         if (!matchesName && !matchesDesc && !matchesAddress && !matchesCourt) {
           return false;
         }
@@ -165,132 +85,83 @@ export default function MarketplacePage() {
   }, [venues, selectedCity, searchTerm]);
 
   return (
-    <div className="min-h-screen bg-[#1F242C] text-slate-100 flex flex-col relative selection:bg-orange-500 selection:text-white">
-      {/* Pattern de fundo esportivo sutil estilo Agendei Quadras */}
+    <div className="min-h-screen bg-slate-50 dark:bg-[#0B1220] text-slate-900 dark:text-slate-100 flex flex-col relative selection:bg-emerald-500 selection:text-white transition-colors">
+      {/* Pattern de fundo esportivo discreto */}
       <div 
-        className="absolute inset-0 pointer-events-none opacity-[0.035]"
+        className="absolute inset-0 pointer-events-none opacity-[0.03] dark:opacity-[0.05]"
         style={{
-          backgroundImage: `radial-gradient(circle at 2px 2px, white 1px, transparent 0)`,
+          backgroundImage: `radial-gradient(circle at 2px 2px, currentColor 1px, transparent 0)`,
           backgroundSize: "32px 32px"
         }}
       />
 
-      {/* Top Header Laranja estilo Agendei Quadras */}
-      <header className="bg-[#EA580C] text-white shadow-md relative z-30">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          {/* Logo ArenaGo com ícone de calendário */}
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="w-10 h-8 rounded-lg bg-white/20 border border-white/40 flex flex-col items-center justify-center p-1 backdrop-blur-xs group-hover:scale-105 transition-transform">
-              <div className="flex gap-1 mb-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
-                <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
-                <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
-              </div>
-              <div className="w-6 h-2.5 bg-white/30 rounded-xs flex items-center justify-around">
-                <span className="w-1 h-1 rounded-full bg-white"></span>
-                <span className="w-1 h-1 rounded-full bg-white"></span>
-              </div>
-            </div>
-            <div>
-              <span className="text-2xl font-black tracking-tight text-white font-sans lowercase">
-                arenago
-              </span>
-              <span className="hidden sm:inline-block ml-2 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/20 text-orange-50">
-                Marketplace
-              </span>
-            </div>
-          </Link>
-
-          {/* Atalhos do Jogador no Topo Direito */}
-          <div className="flex items-center gap-4 sm:gap-6 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-xs sm:text-sm font-medium text-white/95">
-                {currentUser ? `Olá, ${currentUser.name}` : "Olá, Visitante"}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2.5">
-              <Link 
-                href="/player" 
-                title="Minhas Reservas"
-                className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center text-white transition-colors"
-              >
-                <Calendar className="w-4 h-4" />
-              </Link>
-
-              <a 
-                href="https://instagram.com" 
-                target="_blank" 
-                rel="noreferrer" 
-                title="Suporte / Instagram"
-                className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center text-white transition-colors"
-              >
-                <MessageCircle className="w-4 h-4" />
-              </a>
-
-              {currentUser ? (
-                <Link
-                  href="/player"
-                  className="w-9 h-9 rounded-full bg-white text-orange-600 font-extrabold flex items-center justify-center text-sm shadow-sm hover:scale-105 transition-transform"
-                >
-                  {currentUser.name.charAt(0).toUpperCase()}
-                </Link>
-              ) : (
-                <Link
-                  href="/login"
-                  className="px-3 py-1.5 rounded-full bg-white text-orange-600 font-bold text-xs shadow-sm hover:bg-orange-50 transition"
-                >
-                  Entrar
-                </Link>
-              )}
-            </div>
+      {/* Top Banner Verde-Esmeralda & Azul-Marinho */}
+      <section className="bg-gradient-to-r from-[#0F172A] via-[#059669] to-[#0F172A] text-white shadow-md relative z-20 py-8 sm:py-12 px-4 sm:px-6">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur-md px-3.5 py-1 text-xs font-semibold text-emerald-200 border border-white/15 mb-3">
+            <Sparkles className="w-3.5 h-3.5 text-emerald-300" />
+            <span>Aluguel de Quadras Esportivas em Tempo Real</span>
           </div>
+          <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white mb-2">
+            Encontre e Reserve Sua Quadra Favorita
+          </h1>
+          <p className="text-sm sm:text-base text-emerald-100/90 max-w-xl mx-auto">
+            Beach tennis, futebol society, futevôlei, vôlei e mais. Sem filas, com confirmação imediata.
+          </p>
         </div>
-      </header>
+      </section>
 
-      {/* Conteúdo Centralizado no estilo 'Centros Esportivos' */}
-      <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-8 sm:py-12 relative z-10 flex flex-col justify-center">
-        
-        {/* Card Principal Branco com Bordas Arredondadas */}
-        <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 text-slate-800 border border-slate-200/80 transition-all">
+      {/* Conteúdo Centralizado */}
+      <main className="flex-1 max-w-3xl w-full mx-auto px-4 py-8 relative z-10 flex flex-col">
+        {/* Card Principal */}
+        <div className="bg-white dark:bg-[#0F172A] rounded-2xl shadow-xl p-6 sm:p-8 border border-slate-200 dark:border-slate-800 transition-all">
           
-          {/* Cabeçalho do Card: 'Centros Esportivos' e seletor de Cidade */}
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-              Centros Esportivos
-            </h1>
+          {/* Cabeçalho do Card: 'Centros Esportivos' e Seletor de Cidade */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-slate-100 dark:border-slate-800 gap-3 mb-6">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+                Centros Esportivos
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                {filteredVenues.length} {filteredVenues.length === 1 ? "arena disponível" : "arenas disponíveis"}
+              </p>
+            </div>
 
-            {/* Dropdown de Cidade estilo Agendei Quadras */}
+            {/* Dropdown de Cidade */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setCityDropdownOpen(!cityDropdownOpen)}
-                className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-orange-600 hover:text-orange-700 bg-orange-50/70 hover:bg-orange-100/70 px-3 py-1.5 rounded-full border border-orange-200 transition-colors"
+                className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 px-3.5 py-1.5 rounded-full border border-emerald-200 dark:border-emerald-800 transition-colors"
               >
-                <MapPin className="w-3.5 h-3.5 text-orange-600" />
+                <MapPin className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                 <span>{selectedCity}</span>
-                <ChevronDown className="w-3.5 h-3.5 text-orange-600" />
+                <ChevronDown className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               </button>
 
               {cityDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95">
+                <div className="absolute right-0 mt-2 w-52 bg-white dark:bg-[#0F172A] rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 py-1.5 z-50 animate-in fade-in zoom-in-95">
                   <div className="px-3 py-1 text-[10px] uppercase font-bold text-slate-400">
                     Selecione a Cidade
                   </div>
-                  {cities.map((c) => (
+                  {cities.map((city) => (
                     <button
-                      key={c.label}
+                      key={city}
                       type="button"
                       onClick={() => {
-                        setSelectedCity(c.label);
+                        setSelectedCity(city);
                         setCityDropdownOpen(false);
                       }}
-                      className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-orange-50 transition-colors ${
-                        selectedCity === c.label ? "text-orange-600 font-bold bg-orange-50/50" : "text-slate-700"
+                      className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-emerald-50 dark:hover:bg-slate-800 transition-colors ${
+                        selectedCity === city
+                          ? "text-emerald-700 dark:text-emerald-300 font-bold bg-emerald-50/70 dark:bg-emerald-950/40"
+                          : "text-slate-700 dark:text-slate-300"
                       }`}
                     >
-                      <span>{c.label}</span>
-                      {selectedCity === c.label && <span className="w-1.5 h-1.5 rounded-full bg-orange-600"></span>}
+                      <span>{city}</span>
+                      {selectedCity === city && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -298,7 +169,7 @@ export default function MarketplacePage() {
             </div>
           </div>
 
-          {/* Barra de Pesquisa 'Pesquisar por Centro Esportivo' */}
+          {/* Barra de Pesquisa */}
           <div className="relative mb-6">
             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
               <Search className="w-4 h-4 text-slate-400" />
@@ -307,37 +178,43 @@ export default function MarketplacePage() {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Pesquisar por Centro Esportivo"
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-100 hover:bg-slate-100/80 focus:bg-white text-xs sm:text-sm text-slate-800 placeholder-slate-400 rounded-xl border border-transparent focus:border-orange-500 focus:outline-hidden transition-all shadow-inner"
+              placeholder="Pesquisar por arena, esporte ou endereço..."
+              className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 rounded-xl border border-slate-200 dark:border-slate-700 focus:border-emerald-600 dark:focus:border-emerald-500 focus:outline-none transition-all shadow-inner"
             />
           </div>
 
-          {/* Lista de Cards de Arenas */}
+          {/* Lista de Arenas */}
           <div className="space-y-3.5">
             {loading ? (
-              <div className="py-12 text-center text-slate-400 text-sm">
-                <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+              <div className="py-14 text-center text-slate-400 text-sm">
+                <div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
                 Carregando centros esportivos...
               </div>
             ) : filteredVenues.length === 0 ? (
-              <div className="py-10 text-center text-slate-500">
-                <p className="text-sm font-semibold">Nenhum centro esportivo encontrado.</p>
-                <p className="text-xs text-slate-400 mt-1">Tente trocar a cidade ou o termo de busca.</p>
+              <div className="py-12 text-center text-slate-500 dark:text-slate-400">
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                  Nenhum centro esportivo encontrado.
+                </p>
+                <p className="text-xs text-slate-400 mt-1">
+                  Tente trocar a cidade ou o termo digitado.
+                </p>
                 <button
                   type="button"
                   onClick={() => {
                     setSelectedCity("Todas as Cidades");
                     setSearchTerm("");
                   }}
-                  className="mt-3 text-xs text-orange-600 font-bold hover:underline"
+                  className="mt-3 text-xs text-emerald-600 dark:text-emerald-400 font-bold hover:underline"
                 >
                   Limpar filtros
                 </button>
               </div>
             ) : (
               filteredVenues.map((venue) => {
-                const venueRating = 5.0;
-                const venueReviews = 3;
+                const courtCount = venue.courts ? venue.courts.length : 0;
+                const minPrice = venue.courts && venue.courts.length > 0
+                  ? Math.min(...venue.courts.map(c => Number(c.default_hourly_rate)))
+                  : null;
 
                 return (
                   <Link
@@ -345,54 +222,73 @@ export default function MarketplacePage() {
                     href={`/schedule?venue=${venue.slug || venue.id}`}
                     className="block group"
                   >
-                    <div className="bg-white rounded-xl border border-slate-200 hover:border-orange-500 p-3.5 sm:p-4 flex items-center gap-4 transition-all shadow-xs hover:shadow-md hover:-translate-y-0.5">
+                    <div className="bg-white dark:bg-slate-800/70 rounded-xl border border-slate-200 dark:border-slate-700/80 hover:border-emerald-600 dark:hover:border-emerald-500 p-4 flex items-center gap-4 transition-all shadow-xs hover:shadow-md hover:-translate-y-0.5">
                       
                       {/* Logo / Thumbnail da Arena */}
-                      <div className="w-20 h-16 sm:w-24 sm:h-18 rounded-lg bg-black shrink-0 overflow-hidden flex items-center justify-center p-1.5 relative border border-slate-800">
-                        {venue.slug === "arena-show" ? (
-                          <div className="w-full h-full flex flex-col items-center justify-center text-center">
-                            <span className="text-orange-500 text-[10px] font-black uppercase tracking-wider leading-none">ARENA</span>
-                            <span className="text-white text-xs font-black uppercase tracking-widest leading-none mt-0.5">SHOW</span>
-                            <span className="text-[7px] text-amber-400 mt-1">⭐⭐⭐⭐⭐</span>
-                          </div>
-                        ) : venue.slug === "beach-arena-itaim" ? (
-                          <div className="w-full h-full flex flex-col items-center justify-center text-center">
-                            <span className="text-amber-300 text-[9px] font-black uppercase tracking-wider leading-none">BEACH</span>
-                            <span className="text-emerald-400 text-xs font-black uppercase tracking-widest leading-none mt-0.5">ARENA</span>
-                            <span className="text-[7px] text-slate-300 mt-1">ITAIM BIBI</span>
-                          </div>
+                      <div className="w-20 h-20 sm:w-24 sm:h-22 rounded-xl bg-[#0F172A] shrink-0 overflow-hidden flex items-center justify-center p-2 relative border border-slate-700">
+                        {venue.cover_image_url ? (
+                          <img
+                            src={venue.cover_image_url}
+                            alt={venue.name}
+                            className="w-full h-full object-cover rounded-lg"
+                          />
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center text-center">
-                            <span className="text-sky-400 text-[9px] font-black uppercase tracking-wider leading-none">GALAXY</span>
-                            <span className="text-white text-xs font-black uppercase tracking-widest leading-none mt-0.5">SPORTS</span>
+                            <span className="text-emerald-400 text-[10px] font-black uppercase tracking-wider leading-none">
+                              ARENA
+                            </span>
+                            <span className="text-white text-xs font-black uppercase tracking-widest leading-none mt-1">
+                              {venue.name.slice(0, 8)}
+                            </span>
+                            <span className="text-[8px] text-amber-400 mt-1">⭐⭐⭐⭐⭐</span>
                           </div>
                         )}
                       </div>
 
                       {/* Informações da Arena */}
                       <div className="flex-1 min-w-0">
-                        <h2 className="text-sm sm:text-base font-extrabold text-slate-900 group-hover:text-orange-600 transition-colors truncate">
-                          {venue.name}
-                        </h2>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">
+                            {venue.name}
+                          </h3>
+                        </div>
                         
-                        <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
                           {venue.description || `${venue.address}, ${venue.city}`}
                         </p>
 
-                        <div className="flex items-center gap-1.5 mt-1.5 text-xs">
-                          <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                          <span className="font-bold text-slate-800">
-                            {venueRating.toFixed(1).replace(".", ",")}
+                        <div className="flex flex-wrap items-center gap-3 mt-2 text-xs">
+                          <div className="flex items-center gap-1 text-slate-700 dark:text-slate-300 font-medium">
+                            <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                            <span>5.0</span>
+                            <span className="text-slate-400">(verificada)</span>
+                          </div>
+
+                          <span className="text-slate-300 dark:text-slate-700">•</span>
+
+                          <span className="text-slate-600 dark:text-slate-300">
+                            {courtCount} {courtCount === 1 ? "quadra" : "quadras"}
                           </span>
-                          <span className="text-slate-400">
-                            ({venueReviews} avaliações)
-                          </span>
+
+                          {minPrice !== null && (
+                            <>
+                              <span className="text-slate-300 dark:text-slate-700">•</span>
+                              <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                                A partir de R$ {minPrice.toFixed(0)}/h
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
 
-                      {/* Chevron Laranja */}
-                      <div className="shrink-0 text-orange-500 group-hover:translate-x-1 transition-transform">
-                        <ChevronRight className="w-5 h-5 text-orange-500 stroke-[2.5]" />
+                      {/* Botão de Agendamento com Chevron */}
+                      <div className="shrink-0 flex items-center gap-2">
+                        <span className="hidden sm:inline-block text-xs font-bold text-emerald-600 dark:text-emerald-400 group-hover:translate-x-0.5 transition-transform">
+                          Ver horários
+                        </span>
+                        <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-950/60 group-hover:bg-emerald-600 flex items-center justify-center text-emerald-600 group-hover:text-white transition-colors">
+                          <ChevronRight className="w-4 h-4" />
+                        </div>
                       </div>
                     </div>
                   </Link>
@@ -402,53 +298,47 @@ export default function MarketplacePage() {
           </div>
 
           {/* Divisor */}
-          <div className="my-6 border-t border-slate-100" />
+          <div className="my-6 border-t border-slate-100 dark:border-slate-800" />
 
-          {/* Card Promocional Inferior: "Não encontrou sua quadra favorita?" */}
-          <a
-            href="https://instagram.com"
-            target="_blank"
-            rel="noreferrer"
-            className="block group"
-          >
-            <div className="rounded-xl border border-orange-200 bg-orange-50/40 hover:bg-orange-50 p-3 sm:p-4 flex items-center justify-between gap-3 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 shrink-0">
-                  <Sparkles className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-xs sm:text-sm font-bold text-orange-600">
-                    Não encontrou sua quadra favorita?
-                  </h3>
-                  <p className="text-[11px] sm:text-xs text-slate-600">
-                    Manda o @ deles no nosso Instagram :D
-                  </p>
-                </div>
+          {/* Card de Contato Suporte Geral */}
+          <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/50 dark:bg-emerald-950/20 p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                <MessageCircle className="w-5 h-5" />
               </div>
-
-              <ChevronRight className="w-5 h-5 text-orange-500 shrink-0 group-hover:translate-x-1 transition-transform" />
+              <div>
+                <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                  Dúvidas sobre agendamento ou pagamento?
+                </h4>
+                <p className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-400">
+                  Nossa central de atendimento oficial está disponível via WhatsApp.
+                </p>
+              </div>
             </div>
-          </a>
 
-          {/* Links Rápidos de Acesso ao Painel e Gestão */}
-          <div className="mt-6 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
+            <a
+              href="https://wa.me/5511999998888?text=Ol%C3%A1%21+Gostaria+de+informa%C3%A7%C3%B5es+sobre+o+ArenaGo."
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-xs font-bold text-white transition shadow-sm shrink-0"
+            >
+              <Phone className="w-3.5 h-3.5" />
+              Falar com Suporte
+            </a>
+          </div>
+
+          {/* Rodapé seguro do Card */}
+          <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
             <span>ArenaGo &copy; {new Date().getFullYear()}</span>
-            <div className="flex items-center gap-3 font-medium">
-              <Link href="/manager" className="text-orange-600 hover:underline">
-                Painel do Gestor
-              </Link>
-              <span>•</span>
-              <Link href="/player" className="text-slate-600 hover:text-orange-600">
-                Minhas Reservas
-              </Link>
-              <span>•</span>
-              <Link href="/admin" className="text-slate-600 hover:text-orange-600">
-                SaaS Admin
-              </Link>
-            </div>
+            <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+              Conexão com Neon Tech PostgreSQL
+            </span>
           </div>
         </div>
       </main>
+
+      {/* Botão Flutuante de WhatsApp Geral da Plataforma */}
+      <FloatingWhatsApp />
     </div>
   );
 }
