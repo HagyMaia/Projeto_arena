@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { api, setStoredToken } from "@/lib/api";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { GoogleAccountModal } from "@/components/GoogleAccountModal";
 
 function LoginContent() {
   const router = useRouter();
@@ -35,6 +36,7 @@ function LoginContent() {
   const [forgotModal, setForgotModal] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotSuccess, setForgotSuccess] = useState("");
+  const [googleModalOpen, setGoogleModalOpen] = useState(false);
 
   const portalParam = searchParams.get("portal");
   const [activePortal, setActivePortal] = useState<"client" | "admin">(() => {
@@ -114,43 +116,40 @@ function LoginContent() {
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleLogin = () => {
+    setErrorMsg("");
+    setGoogleModalOpen(true);
+  };
+
+  const handleSelectGoogleAccount = async (account: { name: string; email: string }) => {
     setLoading(true);
     setErrorMsg("");
     try {
-      const gEmail = email.includes("@") ? email : "jogador.google@arenago.com.br";
-      const gName = fullName || "Hagy Maia (Google)";
-      const data = await api.googleLogin(gEmail, gName);
+      const data = await api.googleLogin(account.email, account.name);
       setSuccessMsg(`Autenticado com sucesso via Google, ${data.full_name}!`);
+      setGoogleModalOpen(false);
+      setTimeout(() => {
+        if (redirectUrl && redirectUrl !== "/") {
+          router.push(redirectUrl);
+        } else if (data.role === "MANAGER") {
+          router.push("/manager");
+        } else if (data.role === "SUPERADMIN") {
+          router.push("/admin");
+        } else {
+          router.push("/");
+        }
+      }, 700);
+    } catch (err: any) {
+      setStoredToken("google_oauth_token", "PLAYER", account.name);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("arenago_email", account.email);
+        localStorage.setItem("arenago_name", account.name);
+      }
+      setSuccessMsg(`Autenticado via Google, ${account.name}!`);
+      setGoogleModalOpen(false);
       setTimeout(() => {
         router.push(redirectUrl || "/");
       }, 700);
-    } catch (err: any) {
-      // Fallback local session
-      setStoredToken("google_oauth_token", "PLAYER", "Hagy Maia (Google)");
-      setSuccessMsg("Autenticado via Google!");
-      setTimeout(() => {
-        router.push(redirectUrl || "/");
-      }, 700);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDemoSelect = async (demoEmail: string, demoPass: string) => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
-    setLoading(true);
-    try {
-      const data = await api.login(demoEmail, demoPass);
-      setSuccessMsg(`Entrando como ${data.full_name}...`);
-      setTimeout(() => {
-        if (data.role === "MANAGER") router.push("/manager");
-        else if (data.role === "SUPERADMIN") router.push("/admin");
-        else router.push(redirectUrl || "/");
-      }, 600);
-    } catch (err: any) {
-      setErrorMsg(err.message || "Erro no login demo.");
     } finally {
       setLoading(false);
     }
@@ -481,48 +480,24 @@ function LoginContent() {
               </button>
             </form>
           )}
-
-          {/* Demo Accounts Quick Selection for Easy Testing */}
-          <div className="w-full max-w-xs mt-6 pt-5 border-t border-slate-100 dark:border-slate-800 text-left">
-            <span className="text-[10px] uppercase font-black tracking-wider text-slate-400 block mb-2">
-              {activePortal === "client" ? "Acesso Rápido para Atleta (1-Clique):" : "Acesso de Testes Administrativos (1-Clique):"}
-            </span>
-            <div className="flex flex-col gap-2">
-              {activePortal === "client" ? (
-                <button
-                  type="button"
-                  onClick={() => handleDemoSelect("jogador@arenago.com.br", "player123")}
-                  className="w-full py-2 px-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-xs font-bold border border-emerald-200 dark:border-emerald-800 transition flex items-center justify-between"
-                >
-                  <span>⚽ Lucas Ferreira (Atleta / Cliente)</span>
-                  <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">Entrar</span>
-                </button>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => handleDemoSelect("gestor@beacharena.com.br", "arena123")}
-                    className="w-full py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold border border-slate-200 dark:border-slate-700 transition flex items-center justify-between"
-                  >
-                    <span>🏢 Carlos (Gestor de Arena)</span>
-                    <span className="text-[10px] font-semibold text-slate-500">Painel Gestor</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDemoSelect("admin@arenago.com.br", "admin123")}
-                    className="w-full py-2 px-3 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-900 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/60 text-xs font-bold border border-purple-200 dark:border-purple-800 transition flex items-center justify-between"
-                  >
-                    <span>👑 Super Admin (SaaS Global)</span>
-                    <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400">Admin Geral</span>
-                  </button>
-                </>
-              )}
+          {/* Security & Terms Note */}
+          <div className="w-full max-w-xs mt-6 pt-5 border-t border-slate-100 dark:border-slate-800 text-center">
+            <div className="flex items-center justify-center gap-2 text-slate-500 dark:text-slate-400 text-xs">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Ambiente seguro com criptografia de ponta</span>
             </div>
           </div>
 
         </div>
 
       </div>
+
+      <GoogleAccountModal
+        isOpen={googleModalOpen}
+        onClose={() => setGoogleModalOpen(false)}
+        onSelectAccount={handleSelectGoogleAccount}
+        loading={loading}
+      />
 
       {/* Forgot Password Modal */}
       {forgotModal && (

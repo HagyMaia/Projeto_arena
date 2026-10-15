@@ -29,7 +29,6 @@ export default function Navbar() {
   const [user, setUser] = useState<{ role: string; name: string } | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [loadingRole, setLoadingRole] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const officialSupportUrl = getOfficialSupportWhatsAppUrl();
@@ -53,21 +52,6 @@ export default function Navbar() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const handleQuickLogin = async (email: string, pass: string) => {
-    setLoadingRole(true);
-    try {
-      const data = await api.login(email, pass);
-      setUser({ role: data.role, name: data.full_name });
-      setDropdownOpen(false);
-      setMobileMenuOpen(false);
-      window.location.reload();
-    } catch (err: any) {
-      alert(`Erro ao autenticar: ${err.message}`);
-    } finally {
-      setLoadingRole(false);
-    }
-  };
 
   const handleLogout = () => {
     clearStoredToken();
@@ -634,42 +618,6 @@ export default function Navbar() {
                           <UserIcon className="w-3.5 h-3.5 text-slate-400" />
                           <span>Portal do Jogador (Reservas)</span>
                         </Link>
-                      </div>
-
-                      {/* Ferramentas de Testes e Alternância de Papéis (Apenas para Gestão) */}
-                      <div className="border-t border-slate-100 dark:border-slate-800 pt-1 mt-1 px-2">
-                        <div className="px-2 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                          Simular Perfil de Testes
-                        </div>
-                        <div className="grid grid-cols-3 gap-1 py-1">
-                          <button
-                            type="button"
-                            disabled={loadingRole}
-                            onClick={() => handleQuickLogin("jogador@arenago.com.br", "player123")}
-                            className="px-2 py-1 text-[10px] font-bold rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-600 text-center transition"
-                            title="Alternar para visão de Jogador"
-                          >
-                            Jogador
-                          </button>
-                          <button
-                            type="button"
-                            disabled={loadingRole}
-                            onClick={() => handleQuickLogin("gestor@beacharena.com.br", "arena123")}
-                            className="px-2 py-1 text-[10px] font-bold rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-600 text-center transition"
-                            title="Alternar para Gestor"
-                          >
-                            Gestor
-                          </button>
-                          <button
-                            type="button"
-                            disabled={loadingRole}
-                            onClick={() => handleQuickLogin("admin@arenago.com.br", "admin123")}
-                            className="px-2 py-1 text-[10px] font-bold rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-600 text-center transition"
-                            title="Alternar para Super Admin"
-                          >
-                            Admin
-                          </button>
-                        </div>
                       </div>
 
                       {/* Suporte & Logout */}

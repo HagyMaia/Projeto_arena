@@ -32,7 +32,6 @@ function PlayerPortalContent() {
   const [loading, setLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [quickLoginLoading, setQuickLoginLoading] = useState(false);
 
   // Carregar usuário e reservas
   const loadUserData = async () => {
@@ -54,19 +53,6 @@ function PlayerPortalContent() {
   useEffect(() => {
     loadUserData();
   }, []);
-
-  // Login rápido de demonstração como Jogador
-  const handleQuickLoginPlayer = async () => {
-    setQuickLoginLoading(true);
-    try {
-      await api.login("jogador@arenago.com.br", "player123");
-      await loadUserData();
-    } catch (err: any) {
-      alert(`Falha no login: ${err.message}`);
-    } finally {
-      setQuickLoginLoading(false);
-    }
-  };
 
   // Logout
   const handleLogout = () => {
@@ -167,24 +153,15 @@ function PlayerPortalContent() {
             </div>
             <h2 className="text-lg font-bold text-slate-900 dark:text-white">Acesse sua Conta de Jogador</h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-6">
-              Para conferir o histórico de agendamentos e sincronização em tempo real, faça login ou use o acesso rápido demonstrativo:
+              Para conferir o histórico de agendamentos e sincronização em tempo real, entre com sua conta:
             </p>
 
-            <div className="space-y-3">
-              <button
-                type="button"
-                disabled={quickLoginLoading}
-                onClick={handleQuickLoginPlayer}
-                className="w-full btn-coral-gradient font-bold py-2.5 px-4 rounded-xl text-xs sm:text-sm shadow-md transition cursor-pointer"
-              >
-                {quickLoginLoading ? "Entrando..." : "1-Clique: Entrar como Lucas Ferreira (Jogador Demo)"}
-              </button>
-
+            <div>
               <Link
-                href="/login"
-                className="w-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold py-2.5 px-4 rounded-xl text-xs block transition"
+                href="/login?redirect=/player"
+                className="w-full btn-coral-gradient font-bold py-3 px-4 rounded-xl text-xs sm:text-sm shadow-md transition block text-center"
               >
-                Fazer Login com Google ou Senha
+                Entrar com Google ou E-mail
               </Link>
             </div>
           </div>
