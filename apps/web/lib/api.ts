@@ -33,12 +33,17 @@ export interface Venue {
   name: string;
   slug: string;
   description?: string;
-  address: string;
+  address?: string;
+  address_street?: string;
+  address_number?: string;
+  neighborhood?: string;
   city: string;
   state: string;
   latitude?: number;
   longitude?: number;
   cover_image_url?: string;
+  rating_average?: number;
+  rating_count?: number;
   courts: Court[];
 }
 
@@ -56,10 +61,20 @@ export interface Booking {
   start_time: string;
   end_time: string;
   status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
-  payment_status: "UNPAID" | "PAID" | "REFUNDED";
+  payment_status: "UNPAID" | "PAID" | "REFUNDED" | "PENDING";
   booking_type: "ONLINE_SINGLE" | "RECURRING_MONTHLY" | "OFFLINE_MANUAL";
   total_amount: number;
+  court_name?: string;
+  venue_name?: string;
+  venue_address?: string;
+  sport_type?: string;
+  notes?: string;
+  payment_method?: string;
+  date_label?: string;
+  time_label?: string;
+  days_away_label?: string;
 }
+
 
 export interface ManagerSlot {
   hour: string;
@@ -423,10 +438,15 @@ export const api = {
     return request<VenueScheduleResponse>(`/venues/${idOrSlug}/schedule${qs}`);
   },
 
-  async googleLogin(email?: string, name?: string) {
+  async googleLogin(credentialOrEmail?: string, name?: string) {
+    const isJwt = credentialOrEmail && credentialOrEmail.includes(".") && credentialOrEmail.length > 50;
+    const bodyPayload = isJwt
+      ? { credential: credentialOrEmail }
+      : { email: credentialOrEmail, name };
+
     const res = await request<any>("/auth/google", {
       method: "POST",
-      body: JSON.stringify({ email, name }),
+      body: JSON.stringify(bodyPayload),
     });
     setStoredToken(res.access_token, res.role, res.full_name);
     return res;

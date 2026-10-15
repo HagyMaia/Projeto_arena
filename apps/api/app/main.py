@@ -7,7 +7,7 @@ import app.models
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal, Base, engine
-from app.services.seed_service import seed_initial_data, seed_platform_contacts
+from app.services.seed_service import seed_initial_data, seed_platform_contacts, seed_venues_catalog
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("arenago")
@@ -32,6 +32,7 @@ async def lifespan(app: FastAPI):
     # Popular dados de demonstração e contato oficial
     async with AsyncSessionLocal() as session:
         await seed_initial_data(session)
+        await seed_venues_catalog(session)
         await seed_platform_contacts(session)
 
 

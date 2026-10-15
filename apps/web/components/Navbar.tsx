@@ -87,6 +87,35 @@ export default function Navbar() {
   const isPlayer = user?.role === "PLAYER";
   const isGuest = !user;
 
+  // Na página inicial ("/"), o marketplace possui seu próprio cabeçalho oficial de atleta (referência Agendei Quadras)
+  if (pathname === "/") {
+    if (isAdmin) {
+      return (
+        <div className="bg-[#0B1220] border-b border-slate-800 text-slate-300 text-xs py-1.5 px-4 sm:px-8 transition-all relative z-50">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className="font-bold text-white text-[11px]">Modo Gestão Ativo</span>
+              <span className="text-slate-500 text-[10px] hidden sm:inline">| Visão do Marketplace</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Link href="/manager" className="text-emerald-400 hover:text-emerald-300 font-bold text-[11px] flex items-center gap-1">
+                <span>Ir para Painel do Gestor</span>
+                <ExternalLink className="w-3 h-3" />
+              </Link>
+              {isSuperAdmin && (
+                <Link href="/admin" className="text-slate-400 hover:text-white font-bold text-[11px]">
+                  SuperAdmin
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  }
+
   // Na tela de checkout, exibe a barra minimalista
   const isMinimalRoute = pathname.startsWith("/checkout");
 
@@ -226,10 +255,9 @@ export default function Navbar() {
   // - O Cliente (PLAYER ou VISITANTE) vê apenas visualizações de cliente (Marketplace, Agendamento, Institucional e Minhas Reservas).
   // - A Administração (GESTOR e SUPERADMIN) tem visão do todo (módulos de gestão + visão do cliente).
   const clientNavLinks = [
-    { href: "/", label: "Centros Esportivos", icon: Trophy, active: pathname === "/" },
-    { href: "/schedule", label: "Agendar Partida", icon: Calendar, active: pathname.startsWith("/schedule") },
-    { href: "/#novidades", label: "Novidades", icon: Sparkles, active: false },
-    { href: "/player", label: isPlayer ? "Minhas Reservas" : "Portal do Jogador", icon: UserIcon, active: pathname.startsWith("/player") },
+    { href: "/", label: "Arenas", icon: Trophy, active: pathname === "/" },
+    { href: "/player", label: isPlayer ? "Minhas Reservas" : "Reservas", icon: Calendar, active: pathname.startsWith("/player") },
+    { href: "/sobre", label: "Sobre o ArenaGo", icon: Sparkles, active: pathname.startsWith("/sobre") },
   ];
 
   const adminExtraLinks = [

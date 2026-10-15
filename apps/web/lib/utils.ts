@@ -67,7 +67,8 @@ export function formatWhatsAppUrl(phone?: string, message?: string): string {
  * Retorna o link oficial da Central de Atendimento da plataforma ArenaGo.
  * wa.me/5592984923316?text=Ol%C3%A1%2C%20preciso%20de%20ajuda%20com%20o%20ArenaGo.
  */
-export function getOfficialSupportWhatsAppUrl(): string {
-  return formatWhatsAppUrl(OFFICIAL_SUPPORT_PHONE_CLEAN, OFFICIAL_SUPPORT_MESSAGE);
+export function getOfficialSupportWhatsAppUrl(customMessage?: string): string {
+  return formatWhatsAppUrl(OFFICIAL_SUPPORT_PHONE_CLEAN, customMessage !== undefined ? customMessage : OFFICIAL_SUPPORT_MESSAGE);
 }
+
 

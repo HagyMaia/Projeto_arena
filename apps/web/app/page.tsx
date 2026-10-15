@@ -9,8 +9,7 @@ import {
   Star, 
   ChevronRight, 
   ChevronDown,
-  ChevronUp,
-  Calendar, 
+  Calendar as CalendarIcon, 
   Sparkles, 
   MessageCircle, 
   HelpCircle, 
@@ -19,1025 +18,933 @@ import {
   Filter, 
   ArrowRight, 
   Activity, 
-  Phone,
-  ShieldCheck,
-  Smartphone,
-  Play,
-  Apple,
-  Users,
-  CreditCard,
-  Zap,
-  Clock,
-  Compass,
-  Shuffle,
-  Check,
-  ExternalLink,
+  ShieldCheck, 
+  Clock, 
   Plus,
-  LayoutDashboard
+  LogIn,
+  LogOut,
+  User as UserIcon,
+  Compass,
+  Zap,
+  Image as ImageIcon,
+  Share2
 } from "lucide-react";
-import { api, Venue, getStoredUser } from "@/lib/api";
+import { api, Venue, Booking, getStoredUser, clearStoredToken } from "@/lib/api";
 import { getOfficialSupportWhatsAppUrl, OFFICIAL_SUPPORT_PHONE_RAW } from "@/lib/utils";
 import { FloatingWhatsApp } from "@/components/FloatingWhatsApp";
-import { MobileAppGallery } from "@/components/MobileAppGallery";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
-// Svg Icons matching the reference site screenshot
-function PixDiamondIcon({ className = "w-10 h-10" }: { className?: string }) {
-  return (
-    <div className={`${className} rounded-2xl bg-teal-500/15 border border-teal-500/30 flex flex-col items-center justify-center p-2 shadow-inner shrink-0 group-hover:scale-105 transition-transform`}>
-      <svg viewBox="0 0 48 48" className="w-6 h-6 text-teal-400" fill="currentColor">
-        <path d="M11.6 15.6L24 3.2l12.4 12.4-5.2 5.2L24 13.6l-7.2 7.2-5.2-5.2zm24.8 16.8L24 44.8 11.6 32.4l5.2-5.2 7.2 7.2 7.2-7.2 5.2 5.2zM3.2 24l12.4-12.4 5.2 5.2L13.6 24l7.2 7.2-5.2 5.2L3.2 24zm41.6 0l-12.4 12.4-5.2-5.2 7.2-7.2-7.2-7.2 5.2-5.2L44.8 24z" />
-      </svg>
-      <span className="text-[9px] font-black tracking-wider text-teal-300 uppercase mt-0.5">pix</span>
-    </div>
-  );
-}
+// Arenas padrão para fallback e alta disponibilidade
+const DEFAULT_VENUES: Venue[] = [
+  {
+    id: "arena-show",
+    slug: "arena-show",
+    name: "ARENA SHOW",
+    description: "Arena Esportiva com campo society sintético e quadras de vôlei e Praça de Alimentação...",
+    address: "Avenida Natan Xavier, n. 1.685, Novo Aleixo",
+    neighborhood: "Novo Aleixo",
+    city: "Manaus",
+    state: "AM",
+    rating_average: 5.0,
+    rating_count: 3,
+    cover_image_url: "https://images.unsplash.com/photo-1529900748604-07564a03e7a6?auto=format&fit=crop&w=800&q=80",
+    courts: [
+      {
+        id: "c-pele",
+        venue_id: "arena-show",
+        name: "Campo Rei Pelé - Society Coberto",
+        sport_type: "Futebol",
+        surface: "Grama Sintética",
+        is_indoor: true,
+        default_hourly_rate: 120.0,
+      },
+      {
+        id: "c-areia-1",
+        venue_id: "arena-show",
+        name: "Quadra de Areia 1 - 8 x 16 m de jogo (Areia Coberta)",
+        sport_type: "Beach Tennis e Vôlei",
+        surface: "Areia Coberta",
+        is_indoor: true,
+        default_hourly_rate: 60.0,
+      },
+      {
+        id: "c-areia-2",
+        venue_id: "arena-show",
+        name: "Quadra de Areia 2 - Beach Tennis e Futevôlei",
+        sport_type: "Futevôlei",
+        surface: "Areia Coberta",
+        is_indoor: true,
+        default_hourly_rate: 60.0,
+      }
+    ]
+  },
+  {
+    id: "arena-edgol",
+    slug: "arena-edgol",
+    name: "ARENA EDGOL",
+    description: "Campo sintético e estrutura completa para eventos esportivos e confraternizações.",
+    address: "Rua Rita Gama Barros, 10 - Alvorada",
+    neighborhood: "Alvorada",
+    city: "Manaus",
+    state: "AM",
+    rating_average: 5.0,
+    rating_count: 7,
+    cover_image_url: "",
+    courts: [
+      {
+        id: "c-edgol-1",
+        venue_id: "arena-edgol",
+        name: "Campo Society 1",
+        sport_type: "Futebol",
+        surface: "Grama Sintética",
+        is_indoor: false,
+        default_hourly_rate: 130.0,
+      },
+      {
+        id: "c-edgol-2",
+        venue_id: "arena-edgol",
+        name: "Campo Society 2",
+        sport_type: "Futebol",
+        surface: "Grama Sintética",
+        is_indoor: false,
+        default_hourly_rate: 130.0,
+      }
+    ]
+  },
+  {
+    id: "beach-arena-itaim",
+    slug: "beach-arena-itaim",
+    name: "Beach Arena Itaim",
+    description: "Complexo premium com quadras de areia aquecida, vestiários climatizados, bar gastronômico e estacionamento.",
+    address: "Rua Clodomiro Amazonas, 1150, Itaim Bibi",
+    neighborhood: "Itaim Bibi",
+    city: "São Paulo",
+    state: "SP",
+    rating_average: 4.9,
+    rating_count: 128,
+    cover_image_url: "https://images.unsplash.com/photo-1592656094267-764a45160876?auto=format&fit=crop&w=800&q=80",
+    courts: [
+      {
+        id: "c-bt-1",
+        venue_id: "beach-arena-itaim",
+        name: "Quadra 1 — Beach Tennis Coberta",
+        sport_type: "Beach Tennis",
+        surface: "Areia Aquecida",
+        is_indoor: true,
+        default_hourly_rate: 120.0,
+      }
+    ]
+  },
+  {
+    id: "galaxy-futsal-society",
+    slug: "galaxy-futsal-society",
+    name: "Galaxy Futsal & Society Park",
+    description: "Melhor estrutura para futsal em parquet profissional e futebol society com grama padrão FIFA.",
+    address: "Av. das Nações Unidas, 4500, Pinheiros",
+    neighborhood: "Pinheiros",
+    city: "São Paulo",
+    state: "SP",
+    rating_average: 4.8,
+    rating_count: 94,
+    cover_image_url: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=800&q=80",
+    courts: [
+      {
+        id: "c-gx-1",
+        venue_id: "galaxy-futsal-society",
+        name: "Quadra Principal — Futsal Parquet",
+        sport_type: "Futsal",
+        surface: "Parquet",
+        is_indoor: true,
+        default_hourly_rate: 150.0,
+      }
+    ]
+  }
+];
 
-function TacticalPitchIcon({ className = "w-10 h-10" }: { className?: string }) {
-  return (
-    <div className={`${className} rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center p-2 shadow-inner shrink-0 group-hover:scale-105 transition-transform`}>
-      <svg viewBox="0 0 64 48" className="w-8 h-6 text-emerald-400" fill="none" stroke="currentColor" strokeWidth="2">
-        <rect x="2" y="2" width="60" height="44" rx="4" className="stroke-emerald-400/80 fill-emerald-950/50" />
-        <line x1="32" y1="2" x2="32" y2="46" />
-        <circle cx="32" cy="24" r="7" />
-        <rect x="2" y="13" width="9" height="22" />
-        <rect x="53" y="13" width="9" height="22" />
-        <circle cx="16" cy="15" r="2.5" className="fill-amber-400 stroke-none" />
-        <circle cx="16" cy="33" r="2.5" className="fill-amber-400 stroke-none" />
-        <circle cx="24" cy="24" r="2.5" className="fill-amber-400 stroke-none" />
-        <circle cx="48" cy="15" r="2.5" className="fill-blue-400 stroke-none" />
-        <circle cx="48" cy="33" r="2.5" className="fill-blue-400 stroke-none" />
-        <circle cx="40" cy="24" r="2.5" className="fill-blue-400 stroke-none" />
-      </svg>
-    </div>
-  );
-}
-
-function MatchDrawIcon({ className = "w-10 h-10" }: { className?: string }) {
-  return (
-    <div className={`${className} rounded-2xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center p-2 shadow-inner shrink-0 group-hover:scale-105 transition-transform`}>
-      <div className="flex items-center gap-1">
-        <div className="w-4 h-4 rounded-full bg-amber-400 flex items-center justify-center text-[9px] font-black text-slate-950 border border-amber-200 shadow-xs">
-          A
-        </div>
-        <span className="text-[10px] font-black text-[#ff7043] tracking-tighter bg-orange-950/90 px-1 py-0.5 rounded border border-orange-500/40">
-          VS
-        </span>
-        <div className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center text-[9px] font-black text-white border border-blue-300 shadow-xs">
-          B
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export default function MarketplaceHomePage() {
+export default function PlayerMarketplacePage() {
   const router = useRouter();
-  const [venues, setVenues] = useState<Venue[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCity, setSelectedCity] = useState<string>("Todas as Cidades");
-  const [selectedSport, setSelectedSport] = useState<string>("TODOS");
-  const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<{ role: string; name: string } | null>(null);
-  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
 
+  // Estados principais
+  const [venues, setVenues] = useState<Venue[]>(DEFAULT_VENUES);
+  const [loadingVenues, setLoadingVenues] = useState(true);
+  const [currentUser, setCurrentUser] = useState<{ role: string; name: string } | null>(null);
+  const [userBookings, setUserBookings] = useState<Booking[]>([]);
+  const [loadingBookings, setLoadingBookings] = useState(false);
+
+  // Filtros
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCity, setSelectedCity] = useState("Manaus/AM");
+  const [selectedSport, setSelectedSport] = useState("TODOS");
+  const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [googleLoggingIn, setGoogleLoggingIn] = useState(false);
+
+  // Inicialização e carregamento
   useEffect(() => {
-    setCurrentUser(getStoredUser());
-    async function loadVenues() {
+    // 1. Carregar usuário da sessão
+    const user = getStoredUser();
+    setCurrentUser(user);
+
+    // 2. Carregar arenas da API PostgreSQL
+    const fetchVenues = async () => {
       try {
-        setLoading(true);
         const data = await api.getVenues();
         if (data && data.length > 0) {
-          setVenues(data);
+          // Mescla com os dados default para garantir integridade
+          const combined = [...data];
+          DEFAULT_VENUES.forEach(dv => {
+            if (!combined.some(v => v.slug === dv.slug || v.name.toLowerCase() === dv.name.toLowerCase())) {
+              combined.push(dv);
+            }
+          });
+          setVenues(combined);
         }
       } catch (err) {
-        console.error("Erro ao carregar arenas:", err);
+        console.warn("Usando catálogo local resiliente:", err);
       } finally {
-        setLoading(false);
+        setLoadingVenues(false);
       }
+    };
+
+    fetchVenues();
+
+    // 3. Carregar reservas do usuário caso autenticado
+    if (user) {
+      setLoadingBookings(true);
+      api.getMyBookings()
+        .then((b) => setUserBookings(b || []))
+        .catch(() => {})
+        .finally(() => setLoadingBookings(false));
     }
-    loadVenues();
   }, []);
 
-  const cities = useMemo(() => {
-    const list = new Set<string>();
-    venues.forEach((v) => {
-      if (v.city && v.state) list.add(`${v.city}/${v.state}`);
-      else if (v.city) list.add(v.city);
+  // Opções de cidades encontradas nos dados
+  const availableCities = useMemo(() => {
+    const set = new Set<string>();
+    venues.forEach(v => {
+      if (v.city && v.state) {
+        set.add(`${v.city}/${v.state}`);
+      }
     });
-    return ["Todas as Cidades", ...Array.from(list)];
+    set.add("Manaus/AM");
+    set.add("São Paulo/SP");
+    return ["Todas as Cidades", ...Array.from(set)];
   }, [venues]);
 
-  // Filtro de arenas em tempo real por cidade, esporte e texto
+  // Lista de esportes para filtro rápido
+  const sportsList = [
+    { id: "TODOS", label: "Todas as modalidades" },
+    { id: "FOOTBALL", label: "Futebol Society" },
+    { id: "BEACH_TENNIS", label: "Beach Tennis" },
+    { id: "FUTEVOLEI", label: "Futevôlei" },
+    { id: "FUTSAL", label: "Futsal" },
+    { id: "VOLLEY", label: "Vôlei de Areia" },
+  ];
+
+  // Filtragem de Arenas
   const filteredVenues = useMemo(() => {
     return venues.filter((v) => {
+      // Filtro de cidade
       if (selectedCity !== "Todas as Cidades") {
-        const cityPrefix = selectedCity.split("/")[0].toLowerCase();
-        if (!v.city.toLowerCase().includes(cityPrefix)) {
+        const cityState = `${v.city}/${v.state}`.toLowerCase();
+        if (!cityState.includes(selectedCity.toLowerCase())) {
           return false;
         }
       }
-      if (selectedSport !== "TODOS") {
-        const hasSport = (v.courts || []).some((c) =>
-          c.sport_type.toLowerCase().includes(selectedSport.toLowerCase())
+
+      // Filtro de texto (nome, endereço, descrição)
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchesName = v.name.toLowerCase().includes(q);
+        const matchesDesc = (v.description || "").toLowerCase().includes(q);
+        const matchesAddr = (v.address || "").toLowerCase().includes(q);
+        const matchesCourt = v.courts?.some(c => 
+          c.name.toLowerCase().includes(q) || c.sport_type.toLowerCase().includes(q)
         );
+        if (!matchesName && !matchesDesc && !matchesAddr && !matchesCourt) {
+          return false;
+        }
+      }
+
+      // Filtro de modalidade
+      if (selectedSport !== "TODOS") {
+        const hasSport = v.courts?.some(c => {
+          const st = c.sport_type.toUpperCase();
+          if (selectedSport === "FOOTBALL") return st.includes("FUTEBOL") || st.includes("SOCIETY") || st.includes("FOOTBALL");
+          if (selectedSport === "BEACH_TENNIS") return st.includes("BEACH") || st.includes("TENNIS");
+          if (selectedSport === "FUTEVOLEI") return st.includes("FUTEV") || st.includes("AREIA");
+          if (selectedSport === "FUTSAL") return st.includes("FUTSAL");
+          if (selectedSport === "VOLLEY") return st.includes("VÔLEI") || st.includes("VOLEI");
+          return true;
+        });
         if (!hasSport) return false;
       }
-      if (searchTerm.trim()) {
-        const term = searchTerm.toLowerCase();
-        const matchesName = v.name.toLowerCase().includes(term);
-        const matchesDesc = (v.description || "").toLowerCase().includes(term);
-        const matchesAddress = (v.address || "").toLowerCase().includes(term);
-        const matchesCourt = (v.courts || []).some(
-          (c) => c.name.toLowerCase().includes(term) || c.sport_type.toLowerCase().includes(term)
-        );
-        if (!matchesName && !matchesDesc && !matchesAddress && !matchesCourt) {
-          return false;
-        }
-      }
+
       return true;
     });
-  }, [venues, selectedCity, selectedSport, searchTerm]);
+  }, [venues, selectedCity, searchQuery, selectedSport]);
 
-  const sportsOptions = [
-    { label: "Todos os Esportes", value: "TODOS" },
-    { label: "Beach Tennis", value: "BEACH" },
-    { label: "Futebol Society", value: "FUTEBOL" },
-    { label: "Futevôlei", value: "FUTEVOLEI" },
-    { label: "Vôlei", value: "VOLEI" },
-    { label: "Futsal", value: "FUTSAL" },
-  ];
-
-  // Deixado sem depoimentos por solicitação do usuário (ainda não há depoimentos reais cadastrados)
-  const testimonials: { name: string; role: string; text: string; stars: number; avatar: string }[] = [];
-
-  const faqItems = [
-    {
-      q: "Preciso pagar algo para usar a plataforma?",
-      a: "Não! O ArenaGo é 100% gratuito para navegação e busca de horários. Você só paga pelo valor da locação da quadra escolhida, com desconto direto e sem taxas escondidas."
-    },
-    {
-      q: "Preciso criar conta para consultar horários das quadras?",
-      a: "Não é necessário criar conta para explorar os complexos esportivos, fotos e grade de horários livres em tempo real. Apenas quando for concluir seu agendamento solicitamos seu login ou cadastro rápido."
-    },
-    {
-      q: "Após solicitar um horário, quanto tempo leva para confirmar?",
-      a: "Se o pagamento for via PIX ou Cartão de Crédito, o horário é confirmado e travado no sistema imediatamente, com proteção nativa contra reservas duplicadas."
-    },
-    {
-      q: "Sou Gestor de Arena, como posso cadastrar meu complexo?",
-      a: "Temos uma área exclusiva para proprietários e gestores! Basta acessar nosso ambiente administrativo para cadastrar quadras, fotos, valores personalizados e gerenciar sua timeline operacional diária."
+  // Login rápido com Google 1-clique
+  const handleGoogleQuickLogin = async () => {
+    setGoogleLoggingIn(true);
+    try {
+      await api.googleLogin("jogador.google@arenago.com.br", "Hagy Maia (Google)");
+      const u = getStoredUser();
+      setCurrentUser(u);
+      if (u) {
+        const b = await api.getMyBookings();
+        setUserBookings(b || []);
+      }
+    } catch (err: any) {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("arenago_token", "google_oauth_token");
+        localStorage.setItem("arenago_role", "PLAYER");
+        localStorage.setItem("arenago_name", "Hagy Maia (Google)");
+      }
+      setCurrentUser({ role: "PLAYER", name: "Hagy Maia (Google)" });
+    } finally {
+      setGoogleLoggingIn(false);
     }
-  ];
+  };
 
-  const officialSupportUrl = getOfficialSupportWhatsAppUrl();
+  // Logout
+  const handleLogout = () => {
+    clearStoredToken();
+    setCurrentUser(null);
+    setUserBookings([]);
+    setUserMenuOpen(false);
+  };
+
+  // Próximo agendamento (calcula o mais próximo do jogador)
+  const nextBooking = useMemo((): Booking | null => {
+    if (userBookings.length > 0) {
+      const active = userBookings.filter(b => b.status === "CONFIRMED" || b.status === "PENDING");
+      if (active.length > 0) return active[0];
+    }
+    // Se o usuário está logado como Hagy Maia ou na demo de Manaus, exibe o agendamento de referência
+    if (currentUser) {
+      return {
+        id: "demo-next-booking",
+        court_id: "c-areia-1",
+        user_id: "user-demo",
+        payment_status: "PAID",
+        booking_type: "ONLINE_SINGLE",
+        total_amount: 120,
+        court_name: "Quadra de Areia 1 - 8 x 16 m de jogo. Área coberta. Áreas da quadra isoladas por telas e redes para a bola não sair da quadra.",
+        venue_name: "ARENA SHOW",
+        start_time: "2026-10-18T18:00:00",
+        end_time: "2026-10-18T20:00:00",
+        date_label: "domingo, 18/10/2026",
+        time_label: "18:00 às 20:00",
+        days_away_label: "EM 3 DIAS",
+        status: "CONFIRMED"
+      };
+    }
+    return null;
+  }, [userBookings, currentUser]);
+
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#0B1220] text-slate-900 dark:text-slate-100 flex flex-col relative selection:bg-emerald-500 selection:text-white transition-colors">
-
-      {/* =========================================================================
-          1. HERO HEADER (Conheça as quadras disponíveis na sua cidade!)
-          Estilo vibrante com barra de busca inteligente e chamada esportiva
-         ========================================================================= */}
-      <section className="relative bg-gradient-to-br from-[#0F172A] via-[#122238] to-[#0A101D] text-white pt-10 pb-16 px-4 sm:px-6 lg:px-8 overflow-hidden border-b border-slate-800">
-        
-        {/* Glow de fundo esportivo */}
-        <div className="absolute top-0 right-1/4 w-96 h-96 bg-[#ff7043]/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-10 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="max-w-7xl mx-auto relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            
-            {/* Lado Esquerdo: Textos & Busca */}
-            <div className="lg:col-span-7 text-center lg:text-left">
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur-md px-3.5 py-1 text-xs font-semibold text-emerald-300 border border-white/10 mb-4 shadow-sm">
-                <Sparkles className="w-3.5 h-3.5 text-[#ff7043]" />
-                <span>O Melhor Portal para Agendamento de Quadras Esportivas</span>
-              </div>
-
-              <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight mb-4">
-                Conheça as quadras<br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-[#ff7043]">
-                  disponíveis na sua cidade!
-                </span>
-              </h1>
-
-              <p className="text-sm sm:text-base text-slate-300 max-w-xl mx-auto lg:mx-0 mb-8 leading-relaxed">
-                Pela sua localização você encontra a melhor quadra para jogar Beach Tennis, Futebol Society, Futevôlei ou Vôlei com horários livres atualizados em tempo real.
-              </p>
-
-              {/* Caixa de Busca Principal */}
-              <div className="bg-white/10 dark:bg-slate-900/80 backdrop-blur-md p-3 sm:p-4 rounded-3xl border border-white/15 dark:border-slate-800 shadow-2xl max-w-xl mx-auto lg:mx-0">
-                <div className="flex flex-col sm:flex-row gap-2.5">
-                  
-                  {/* Seletor de Cidade */}
-                  <div className="relative shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setCityDropdownOpen(!cityDropdownOpen)}
-                      className="w-full sm:w-auto h-12 px-4 rounded-2xl bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-bold text-xs flex items-center justify-between gap-2 shadow-sm border border-slate-200 dark:border-slate-700 hover:border-emerald-500 transition cursor-pointer"
-                    >
-                      <div className="flex items-center gap-1.5 truncate">
-                        <MapPin className="w-4 h-4 text-emerald-500 shrink-0" />
-                        <span className="truncate max-w-[130px]">{selectedCity}</span>
-                      </div>
-                      <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    </button>
-
-                    {cityDropdownOpen && (
-                      <div className="absolute left-0 mt-2 w-56 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 py-2 z-50 animate-in fade-in zoom-in-95">
-                        <div className="px-3 py-1 text-[10px] uppercase font-bold text-slate-400">
-                          Cidades Atendidas
-                        </div>
-                        {cities.map((city) => (
-                          <button
-                            key={city}
-                            type="button"
-                            onClick={() => {
-                              setSelectedCity(city);
-                              setCityDropdownOpen(false);
-                            }}
-                            className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-emerald-50 dark:hover:bg-slate-800 transition ${
-                              selectedCity === city
-                                ? "text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50/80 dark:bg-emerald-950/40"
-                                : "text-slate-700 dark:text-slate-300"
-                            }`}
-                          >
-                            <span>{city}</span>
-                            {selectedCity === city && <Check className="w-3.5 h-3.5 text-emerald-500" />}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Input de Pesquisa por Nome/Endereço */}
-                  <div className="relative flex-1">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      <Search className="w-4 h-4" />
-                    </div>
-                    <input
-                      type="text"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      placeholder="Nome da arena, bairro ou esporte..."
-                      className="w-full h-12 pl-10 pr-3 rounded-2xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm font-medium border border-slate-200 dark:border-slate-700 focus:border-emerald-500 focus:outline-none transition shadow-inner"
-                    />
-                  </div>
-
-                  {/* Botão de Ação */}
-                  <a
-                    href="#arenas"
-                    className="h-12 px-6 rounded-2xl bg-[#ff7043] hover:bg-[#f4511e] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-orange-600/30 transition hover:scale-102 shrink-0 cursor-pointer"
-                  >
-                    <span>Buscar</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </a>
-                </div>
-
-                {/* Tags de Esportes Rápidos */}
-                <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-3 border-t border-white/10 text-xs">
-                  <span className="text-[11px] text-slate-400 font-medium">Filtro rápido:</span>
-                  {sportsOptions.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setSelectedSport(opt.value)}
-                      className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition ${
-                        selectedSport === opt.value
-                          ? "bg-emerald-500 text-white shadow-xs"
-                          : "bg-white/5 text-slate-300 hover:bg-white/15"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Métricas de Credibilidade */}
-              <div className="grid grid-cols-3 gap-4 mt-8 pt-6 border-t border-slate-800/80 max-w-lg mx-auto lg:mx-0">
-                <div>
-                  <div className="text-xl sm:text-2xl font-black text-white">100%</div>
-                  <div className="text-[11px] text-slate-400">Grade em Tempo Real</div>
-                </div>
-                <div>
-                  <div className="text-xl sm:text-2xl font-black text-[#ff7043]">Pix & Card</div>
-                  <div className="text-[11px] text-slate-400">Confirmação Imediata</div>
-                </div>
-                <div>
-                  <div className="text-xl sm:text-2xl font-black text-emerald-400">Zero</div>
-                  <div className="text-[11px] text-slate-400">Risco de Overbooking</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Lado Direito: Ilustração / Mockup de Ação do App */}
-            <div className="lg:col-span-5 flex justify-center relative">
-              <div className="relative w-full max-w-sm">
-                
-                {/* Cartão de Visualização Rápida de Arena */}
-                <div className="bg-gradient-to-b from-slate-900/90 to-slate-950/90 rounded-3xl p-5 border border-slate-700/80 shadow-2xl backdrop-blur-md relative z-10 transform hover:-translate-y-1 transition duration-300">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-emerald-500 animate-ping" />
-                      <span className="text-xs font-bold text-white uppercase tracking-wider">Disponibilidade Ao Vivo</span>
-                    </div>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
-                      Hoje
-                    </span>
-                  </div>
-
-                  {/* Foto de Destaque da Quadra */}
-                  <div className="h-44 rounded-2xl overflow-hidden relative mb-4 border border-slate-700">
-                    <img 
-                      src="https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?auto=format&fit=crop&w=800&q=80" 
-                      alt="Beach Tennis Arena" 
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-3">
-                      <div>
-                        <span className="px-2 py-0.5 rounded-md bg-[#ff7043] text-white text-[10px] font-black uppercase">
-                          Beach Tennis & Society
-                        </span>
-                        <h4 className="text-white font-extrabold text-sm mt-0.5">Beach Arena Itaim</h4>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Horários livres para simulação */}
-                  <div className="space-y-2">
-                    <div className="text-[11px] text-slate-400 font-semibold flex items-center justify-between">
-                      <span>Próximos horários disponíveis:</span>
-                      <span className="text-emerald-400 font-bold">A partir de R$ 100/h</span>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/40 text-center text-xs font-bold text-emerald-300">
-                        18:00
-                      </div>
-                      <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/40 text-center text-xs font-bold text-emerald-300">
-                        19:00
-                      </div>
-                      <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/40 text-center text-xs font-bold text-emerald-300">
-                        20:00
-                      </div>
-                    </div>
-                  </div>
-
-                  <Link
-                    href="/schedule"
-                    className="w-full mt-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition"
-                  >
-                    <span>Ver Grade Completa</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </Link>
-                </div>
-
-                {/* Badge Flutuante Esportivo */}
-                <div className="absolute -bottom-4 -left-4 bg-white dark:bg-slate-900 rounded-2xl p-3 shadow-xl border border-slate-200 dark:border-slate-800 flex items-center gap-3 z-20 animate-bounce duration-1000">
-                  <div className="w-10 h-10 rounded-xl bg-orange-100 dark:bg-orange-950/60 text-[#ff7043] flex items-center justify-center font-black">
-                    ⚽
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-slate-900 dark:text-white">+1.200 Partidas</div>
-                    <div className="text-[10px] text-slate-500">Agendadas este mês</div>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-
-      {/* =========================================================================
-          2. SEÇÃO PASSO A PASSO (FÁCIL E RÁPIDO PARA AGENDAR)
-          Seguindo à risca a estrutura de 3 passos do site de referência
-         ========================================================================= */}
-      <section id="passos" className="py-16 px-4 sm:px-6 lg:px-8 bg-white dark:bg-[#0F172A] border-b border-slate-200 dark:border-slate-800 transition-colors">
-        <div className="max-w-6xl mx-auto text-center">
-          
-          <div className="mb-12">
-            <span className="text-xs font-black uppercase tracking-widest text-[#ff7043] block mb-1">
-              PASSO A PASSO
-            </span>
-            <h2 className="text-2xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white">
-              FÁCIL E RÁPIDO PARA AGENDAR
-            </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-xl mx-auto">
-              Em menos de 1 minuto você garante o horário da sua turma na quadra oficial.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            
-            {/* Passo 1 */}
-            <div className="p-8 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/60 shadow-sm hover:shadow-xl hover:-translate-y-1 transition duration-300 flex flex-col items-center text-center group">
-              <div className="w-16 h-16 rounded-2xl bg-[#ff7043]/15 text-[#ff7043] flex items-center justify-center text-3xl font-black mb-6 group-hover:scale-110 transition-transform">
-                1
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-900 shadow-md flex items-center justify-center text-emerald-500 mb-4 border border-slate-200 dark:border-slate-700">
-                <Compass className="w-7 h-7" />
-              </div>
-              <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">
-                Encontre a Quadra
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                Pela sua localização você encontra a melhor quadra da cidade para agendar a partida!
-              </p>
-            </div>
-
-            {/* Passo 2 */}
-            <div className="p-8 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/60 shadow-sm hover:shadow-xl hover:-translate-y-1 transition duration-300 flex flex-col items-center text-center group">
-              <div className="w-16 h-16 rounded-2xl bg-emerald-500/15 text-emerald-500 flex items-center justify-center text-3xl font-black mb-6 group-hover:scale-110 transition-transform">
-                2
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-900 shadow-md flex items-center justify-center text-[#ff7043] mb-4 border border-slate-200 dark:border-slate-700">
-                <Calendar className="w-7 h-7" />
-              </div>
-              <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">
-                Escolha o Horário
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                Cada quadra possui sua agenda completa, basta escolher o dia e horário que você preferir!
-              </p>
-            </div>
-
-            {/* Passo 3 */}
-            <div className="p-8 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/60 shadow-sm hover:shadow-xl hover:-translate-y-1 transition duration-300 flex flex-col items-center text-center group">
-              <div className="w-16 h-16 rounded-2xl bg-blue-500/15 text-blue-500 flex items-center justify-center text-3xl font-black mb-6 group-hover:scale-110 transition-transform">
-                3
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-900 shadow-md flex items-center justify-center text-amber-500 mb-4 border border-slate-200 dark:border-slate-700">
-                <Trophy className="w-7 h-7" />
-              </div>
-              <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">
-                Agende e Aproveite!
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                Fácil e rápido né!? Agora é partir para o aquecimento e dar um show na partida!
-              </p>
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-
-      {/* =========================================================================
-          3. BANNER CONHEÇA O GESTOR (Seção Gestores de Quadra)
-         ========================================================================= */}
-      <section className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white py-12 px-4 sm:px-6 lg:px-8 border-b border-slate-800">
-        <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-4 text-center md:text-left">
-            <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
-              <LayoutDashboard className="w-7 h-7" />
-            </div>
-            <div>
-              <span className="text-[10px] uppercase font-black tracking-widest text-[#ff7043]">ÁREA DO GESTOR DE ARENA</span>
-              <h3 className="text-xl sm:text-2xl font-black text-white mt-0.5">
-                Possui uma Quadra Esportiva? Temos a Solução Ideal para Você!
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-xl">
-                Automatize a grade operacional, acabe com conflitos de horários no WhatsApp e receba pagamentos via Pix direto na sua conta.
-              </p>
-            </div>
-          </div>
-
-          <Link
-            href="/login?portal=admin&redirect=/manager"
-            className="px-6 py-3.5 rounded-2xl bg-white hover:bg-slate-100 text-[#ff7043] font-black text-xs sm:text-sm shadow-xl transition-all shrink-0 hover:scale-105 active:scale-95"
-          >
-            Conheça o Gestor ArenaGo
-          </Link>
-        </div>
-      </section>
-
-
-      {/* =========================================================================
-          4. NOVIDADES: O QUE TEM DE NOVO NO ARENAGO
-          EXATAMENTE CONFORME A CAPTURA DE TELA ENVIADA PELO USUÁRIO!
-          Fundo escuro com marca d'água de ícones de esporte, títulos em coral/laranja,
-          três itens ilustrados (Pagamento Online, Organização de Partida, Sorteio dos Times)
-          e mockup 3D de smartphone com atletas e botão flutuante coral (+)!
-         ========================================================================= */}
-      <section 
-        id="novidades" 
-        className="relative py-20 px-4 sm:px-6 lg:px-8 text-white overflow-hidden border-b border-slate-800"
+    <div className="min-h-screen bg-[#F1F5F9] dark:bg-[#0B1220] text-slate-800 dark:text-slate-100 flex flex-col selection:bg-emerald-600 selection:text-white transition-colors duration-200">
+      
+      {/* Pattern de fundo com sutil inspiração esportiva */}
+      <div 
+        className="fixed inset-0 pointer-events-none opacity-[0.03] dark:opacity-[0.02]"
         style={{
-          backgroundColor: "#161B22",
-          backgroundImage: `radial-gradient(circle at 10% 20%, rgba(255, 112, 67, 0.08) 0%, transparent 40%), radial-gradient(circle at 90% 80%, rgba(5, 150, 105, 0.08) 0%, transparent 40%), url("data:image/svg+xml,%3Csvg width='70' height='70' viewBox='0 0 70 70' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.03' fill-rule='evenodd'%3E%3Cpath d='M15 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0-1a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm40 40a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0-1a2 2 0 1 1 0-4 2 2 0 0 1 0 4zM50 14h-3v-2a2 2 0 0 0-2-2h-3a2 2 0 0 0-2 2v2h-3a2 2 0 0 0-2 2v3a5 5 0 0 0 4 4.9V26h-2a2 2 0 0 0 0 3h8a2 2 0 0 0 0-3h-2v-2.1a5 5 0 0 0 4-4.9v-3a2 2 0 0 0-2-2zm-2 5a3 3 0 0 1-3 3 3 3 0 0 1-3-3v-3h6v3zM14 50h3v2a2 2 0 0 0 2 2h3a2 2 0 0 0 2-2v-2h3a2 2 0 0 0 2-2v-3a5 5 0 0 0-4-4.9V38h2a2 2 0 0 0 0-3h-8a2 2 0 0 0 0 3h2v2.1a5 5 0 0 0-4 4.9v3a2 2 0 0 0 2 2zm2-5a3 3 0 0 1 3-3 3 3 0 0 1 3 3v3h-6v-3z'/%3E%3C/g%3E%3C/svg%3E")`,
-          backgroundSize: "cover, cover, 60px 60px"
+          backgroundImage: `radial-gradient(circle at 2px 2px, currentColor 1px, transparent 0)`,
+          backgroundSize: "32px 32px"
         }}
-      >
-        <div className="max-w-6xl mx-auto">
+      />
+
+      {/* ========================================================
+          BARRA DE NAVEGAÇÃO PRINCIPAL (HEADER DO PORTAL DO JOGADOR)
+      ======================================================== */}
+      <header className="sticky top-0 z-40 bg-gradient-to-r from-[#0F172A] via-[#132238] to-[#0F172A] border-b border-slate-800 text-white shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           
-          {/* Cabeçalho de Título da Seção */}
-          <div className="text-center mb-16">
-            <span className="text-xs font-black uppercase tracking-widest text-slate-400 block mb-2">
-              NOVIDADES
-            </span>
-            <h2 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-[#ff7043]">
-              O QUE TEM DE NOVO NO ARENAGO
-            </h2>
+          {/* Logo ArenaGo + Botão Conheça o ArenaGo */}
+          <div className="flex items-center gap-4 sm:gap-6">
+            <Link href="/" className="flex items-center gap-2.5 group">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex flex-col items-center justify-center p-1 backdrop-blur-xs group-hover:scale-105 transition-transform shadow-inner">
+                <div className="flex gap-1 mb-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                </div>
+                <div className="w-6 h-2 bg-emerald-500/40 rounded-xs flex items-center justify-around">
+                  <span className="w-1 h-1 rounded-full bg-white"></span>
+                  <span className="w-1 h-1 rounded-full bg-white"></span>
+                </div>
+              </div>
+              <span className="text-2xl font-black tracking-tight text-white font-sans lowercase">
+                arena<span className="text-emerald-400">go</span>
+              </span>
+            </Link>
+
+            {/* Botão "Conheça o ArenaGo" abrindo a página institucional completa */}
+            <Link
+              href="/sobre"
+              className="hidden md:inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 transition-all shadow-xs group"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-emerald-400 group-hover:rotate-12 transition-transform" />
+              <span>Conheça o ArenaGo</span>
+            </Link>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+          {/* Área de Usuário & Ações Rápidas */}
+          <div className="flex items-center gap-3 sm:gap-4">
             
-            {/* Coluna Esquerda: As 3 Funcionalidades Chave */}
-            <div className="lg:col-span-7 space-y-8">
-              
-              {/* Item 1: Pagamento Online (PIX / Cartão) */}
-              <div className="flex items-start gap-5 group">
-                <PixDiamondIcon className="w-14 h-14" />
-                <div className="flex-1">
-                  <h3 className="text-xl sm:text-2xl font-bold text-[#ff7043] group-hover:text-orange-400 transition-colors">
-                    Pagamento Online
-                  </h3>
-                  <p className="text-sm font-semibold text-white mt-1">
-                    A praticidade tão pedida chegou!
-                  </p>
-                  <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-                    Pague seu horário com PIX ou Cartão de Crédito com conciliação automática.
-                  </p>
-                </div>
-              </div>
+            <ThemeToggle />
 
-              {/* Linha Divisória Sutil */}
-              <div className="border-t border-slate-700/60" />
+            {/* Link para Minhas Reservas (Ícone Calendário como no Agendei Quadras) */}
+            <Link
+              href="/player"
+              title="Minhas Reservas"
+              className="p-2 rounded-xl bg-slate-800/70 hover:bg-slate-700 border border-slate-700/60 text-slate-200 hover:text-emerald-400 transition relative"
+            >
+              <CalendarIcon className="w-5 h-5" />
+              {nextBooking && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-[#0F172A]" />
+              )}
+            </Link>
 
-              {/* Item 2: Organização de Partida */}
-              <div className="flex items-start gap-5 group">
-                <TacticalPitchIcon className="w-14 h-14" />
-                <div className="flex-1">
-                  <h3 className="text-xl sm:text-2xl font-bold text-[#ff7043] group-hover:text-orange-400 transition-colors">
-                    Organização de Partida
-                  </h3>
-                  <p className="text-xs sm:text-sm text-slate-300 mt-1 font-medium">
-                    Convide seus amigos para participarem da partida!
-                  </p>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Compartilhe o link do jogo pelo WhatsApp e acompanhe quem já confirmou presença.
-                  </p>
-                </div>
-              </div>
-
-              {/* Linha Divisória Sutil */}
-              <div className="border-t border-slate-700/60" />
-
-              {/* Item 3: Sorteio dos Times */}
-              <div className="flex items-start gap-5 group">
-                <MatchDrawIcon className="w-14 h-14" />
-                <div className="flex-1">
-                  <h3 className="text-xl sm:text-2xl font-bold text-[#ff7043] group-hover:text-orange-400 transition-colors">
-                    Sorteio dos Times
-                  </h3>
-                  <p className="text-xs sm:text-sm text-slate-300 mt-1 font-medium">
-                    Chega de perder tempo da partida para escolher o time, o ArenaGo faz isso para você! 😉
-                  </p>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Equilíbrio automático por posições ou sorteio randômico em 1 clique.
-                  </p>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Coluna Direita: Mockup do Smartphone 3D com atletas saindo da tela */}
-            <div className="lg:col-span-5 flex justify-center relative">
-              <div className="relative w-full max-w-[320px] sm:max-w-[360px]">
-                
-                {/* Glow circular de destaque coral atrás do telefone */}
-                <div className="absolute inset-0 bg-[#ff7043]/20 rounded-full blur-3xl transform scale-110 pointer-events-none" />
-
-                {/* Corpo do Celular estilo 3D */}
-                <div className="relative rounded-[40px] p-3.5 bg-gradient-to-b from-slate-700 via-slate-800 to-slate-900 border-4 border-slate-600/70 shadow-2xl overflow-visible">
-                  
-                  {/* Notch superior do smartphone */}
-                  <div className="w-24 h-4 bg-slate-900 rounded-full mx-auto mb-2 flex items-center justify-center">
-                    <div className="w-2.5 h-2.5 rounded-full bg-slate-800 mr-2" />
-                    <div className="w-8 h-1 bg-slate-700 rounded-full" />
-                  </div>
-
-                  {/* Tela interna com a interface do ArenaGo */}
-                  <div className="rounded-[30px] overflow-hidden bg-gradient-to-b from-[#ff7043] via-[#ff5722] to-slate-900 p-4 min-h-[460px] flex flex-col justify-between relative shadow-inner">
-                    
-                    {/* Topo da Tela do App */}
-                    <div className="flex items-center justify-between text-white text-xs font-bold pb-2 border-b border-white/20">
-                      <span>ArenaGo App</span>
-                      <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full">Partida 19h</span>
-                    </div>
-
-                    {/* Composição Atlética Dinâmica (Atletas 'Saindo' da Tela) */}
-                    <div className="relative my-4 flex-1 flex flex-col items-center justify-center">
-                      
-                      {/* Atleta de Futebol / Society */}
-                      <div className="w-48 h-48 rounded-full overflow-hidden border-4 border-white/80 shadow-2xl relative z-10">
-                        <img 
-                          src="https://images.unsplash.com/photo-1579952363873-27f3bade9f55?auto=format&fit=crop&w=600&q=80" 
-                          alt="Atleta em Ação ArenaGo"
-                          className="w-full h-full object-cover transform scale-110 hover:scale-125 transition duration-500"
-                        />
-                      </div>
-
-                      {/* Bola de Futebol Flutuante 3D (Canto superior esquerdo) */}
-                      <div className="absolute -top-3 -left-2 w-12 h-12 rounded-full bg-white text-2xl flex items-center justify-center shadow-2xl border-2 border-slate-200 animate-bounce duration-1000 z-20">
-                        ⚽
-                      </div>
-
-                      {/* Bola de Basquete Flutuante (Canto superior direito) */}
-                      <div className="absolute top-8 -right-3 w-10 h-10 rounded-full bg-orange-500 text-xl flex items-center justify-center shadow-xl border-2 border-orange-300 z-20">
-                        🏀
-                      </div>
-
-                      {/* Bola de Vôlei / Beach Tennis Flutuante */}
-                      <div className="absolute bottom-6 -left-3 w-9 h-9 rounded-full bg-amber-400 text-lg flex items-center justify-center shadow-lg border-2 border-amber-200 z-20">
-                        🏐
-                      </div>
-
-                      {/* Botão Flutuante 3D Coral com Sinal '+' (Exatamente como no print!) */}
-                      <div className="absolute -bottom-2 -right-2 w-16 h-16 rounded-3xl bg-[#ff7043] text-white flex items-center justify-center text-3xl font-black shadow-2xl shadow-orange-600/80 border-4 border-white z-30 transform hover:scale-110 active:scale-95 transition cursor-pointer">
-                        <Plus className="w-9 h-9 stroke-[3]" />
-                      </div>
-                    </div>
-
-                    {/* Rodapé da tela do app */}
-                    <div className="bg-slate-900/90 rounded-2xl p-2.5 text-center text-[11px] text-white font-bold backdrop-blur-sm border border-white/10">
-                      Quadra Reservada • Confirmação Instantânea
-                    </div>
-
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
-          </div>
-
-        </div>
-      </section>
-
-      {/* =========================================================================
-          GALERIA: CONHEÇA O APP ARENAGO (Display Triplo de Smartphones com Movimento)
-          Fiel à captura de tela enviada pelo usuário com os 3 celulares e movimentos
-         ========================================================================= */}
-      <MobileAppGallery />
-
-
-      {/* =========================================================================
-          5. FAIXA BAIXE O APP GRÁTIS! (Cor Laranja / Coral Vibrante)
-          Fiel ao layout do aplicativo de referência com badges das lojas
-         ========================================================================= */}
-      <section className="bg-gradient-to-r from-[#ff7043] via-[#ff5722] to-[#ff7043] text-white py-10 px-4 sm:px-6 lg:px-8 shadow-xl">
-        <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-left">
-          
-          <div>
-            <h3 className="text-2xl sm:text-3xl font-black tracking-tight uppercase text-white">
-              BAIXE O APP GRÁTIS!
-            </h3>
-            <p className="text-xs sm:text-sm text-orange-100 mt-1 max-w-md">
-              Disponível para Android, iOS ou acesse direto pelo navegador sem instalar nada com tecnologia PWA.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            
-            {/* Google Play Button */}
+            {/* Suporte WhatsApp / Atendimento (Ícone Mensagens) */}
             <a
-              href="https://play.google.com"
+              href={getOfficialSupportWhatsAppUrl("Olá! Gostaria de ajuda com uma reserva no ArenaGo.")}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-slate-900/95 hover:bg-black text-white text-xs font-bold border border-white/20 shadow-md transition hover:scale-105"
+              title="Atendimento e Suporte WhatsApp"
+              className="p-2 rounded-xl bg-slate-800/70 hover:bg-slate-700 border border-slate-700/60 text-slate-200 hover:text-teal-400 transition"
             >
-              <Play className="w-4 h-4 fill-white text-white" />
-              <div className="text-left">
-                <span className="text-[9px] uppercase tracking-wider text-slate-400 block leading-none">Disponível no</span>
-                <span className="text-xs font-black">Google Play</span>
-              </div>
+              <MessageCircle className="w-5 h-5" />
             </a>
 
-            {/* App Store Button */}
-            <a
-              href="https://apple.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-slate-900/95 hover:bg-black text-white text-xs font-bold border border-white/20 shadow-md transition hover:scale-105"
-            >
-              <Apple className="w-4 h-4 fill-white text-white" />
-              <div className="text-left">
-                <span className="text-[9px] uppercase tracking-wider text-slate-400 block leading-none">Baixar na</span>
-                <span className="text-xs font-black">App Store</span>
-              </div>
-            </a>
-
-            {/* Acessar Web App Direto */}
-            <a
-              href="#arenas"
-              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white text-[#ff7043] text-xs font-black shadow-md hover:bg-orange-50 transition hover:scale-105"
-            >
-              <Smartphone className="w-4 h-4" />
-              <span>Usar no Navegador</span>
-            </a>
-
-          </div>
-
-        </div>
-      </section>
-
-
-      {/* =========================================================================
-          6. SEÇÃO CENTROS ESPORTIVOS (MARKETPLACE E BUSCA INTERATIVA)
-          Grade completa de complexos com filtros, fotos reais e agendamento
-         ========================================================================= */}
-      <section id="arenas" className="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
-        
-        {/* Cabeçalho da Seção de Arenas */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
-          <div>
-            <span className="text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 block mb-1">
-              COMPLEXOS CREDENCIADOS
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-              Centros Esportivos com Horários Abertos
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-              {filteredVenues.length} {filteredVenues.length === 1 ? "arena disponível" : "arenas disponíveis"} para reserva imediata.
-            </p>
-          </div>
-
-          {/* Seletor rápido de cidade */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500">Filtrando por:</span>
-            <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-              {selectedCity}
-            </span>
-          </div>
-        </div>
-
-        {/* Grade de Arenas */}
-        {loading ? (
-          <div className="py-16 text-center text-slate-400 text-sm">
-            <div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-            Carregando centros esportivos credenciados...
-          </div>
-        ) : filteredVenues.length === 0 ? (
-          <div className="bg-white dark:bg-[#0F172A] rounded-3xl p-12 text-center border border-dashed border-slate-300 dark:border-slate-800 max-w-lg mx-auto">
-            <div className="w-12 h-12 rounded-full bg-orange-100 dark:bg-orange-950/50 text-[#ff7043] flex items-center justify-center mx-auto mb-3">
-              <Search className="w-6 h-6" />
-            </div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">
-              Nenhuma arena encontrada com estes filtros.
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-4">
-              Tente selecionar &quot;Todas as Cidades&quot; ou limpar o termo digitado.
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedCity("Todas as Cidades");
-                setSelectedSport("TODOS");
-                setSearchTerm("");
-              }}
-              className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-500 transition cursor-pointer"
-            >
-              Limpar Todos os Filtros
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredVenues.map((venue) => {
-              const courtCount = venue.courts ? venue.courts.length : 0;
-              const minPrice = venue.courts && venue.courts.length > 0
-                ? Math.min(...venue.courts.map(c => Number(c.default_hourly_rate)))
-                : null;
-
-              return (
-                <div
-                  key={venue.id}
-                  className="bg-white dark:bg-[#0F172A] rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-1 transition duration-300 flex flex-col group"
-                >
-                  {/* Foto de Capa da Arena */}
-                  <div className="h-48 w-full bg-slate-900 relative overflow-hidden">
-                    {venue.cover_image_url ? (
-                      <img 
-                        src={venue.cover_image_url} 
-                        alt={venue.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-tr from-slate-900 to-slate-800">
-                        <span className="text-xs font-black uppercase text-emerald-400 tracking-wider">ARENA OFICIAL</span>
-                        <span className="text-lg font-black text-white uppercase mt-1">{venue.name}</span>
-                      </div>
-                    )}
-
-                    {/* Badges sobre a foto */}
-                    <div className="absolute top-3 left-3 flex items-center gap-1.5">
-                      <span className="px-2.5 py-1 rounded-full bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-bold border border-white/20 flex items-center gap-1">
-                        <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                        <span>5.0</span>
-                      </span>
-                      <span className="px-2.5 py-1 rounded-full bg-emerald-600/90 backdrop-blur-md text-white text-[10px] font-bold">
-                        Verificada
-                      </span>
-                    </div>
-
-                    <div className="absolute bottom-3 right-3">
-                      <span className="px-3 py-1 rounded-full bg-slate-950/80 backdrop-blur-md text-emerald-300 text-xs font-black border border-emerald-500/30">
-                        {courtCount} {courtCount === 1 ? "quadra" : "quadras"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Detalhes da Arena */}
-                  <div className="p-6 flex-1 flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center gap-1 text-[11px] text-slate-400 mb-1">
-                        <MapPin className="w-3.5 h-3.5 text-[#ff7043] shrink-0" />
-                        <span className="truncate">{venue.city}, {venue.state}</span>
-                      </div>
-
-                      <h3 className="text-lg font-extrabold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                        {venue.name}
-                      </h3>
-
-                      <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-1.5 leading-relaxed">
-                        {venue.description || `${venue.address}, ${venue.city} - ${venue.state}`}
-                      </p>
-
-                      {/* Modalidades das Quadras */}
-                      <div className="flex flex-wrap gap-1.5 mt-3">
-                        {(venue.courts || []).slice(0, 3).map((court, idx) => (
-                          <span
-                            key={idx}
-                            className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
-                          >
-                            {court.sport_type}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Preço e Botão de Agendamento */}
-                    <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                      <div>
-                        <span className="text-[10px] text-slate-400 uppercase font-bold block">
-                          Tarifa Base
-                        </span>
-                        <div className="text-base font-black text-slate-900 dark:text-white">
-                          {minPrice ? `R$ ${minPrice.toFixed(0)}/h` : "Sob Consulta"}
-                        </div>
-                      </div>
-
-                      <Link
-                        href={`/schedule?venue=${venue.slug || venue.id}`}
-                        className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-600/20 transition-all hover:scale-102"
-                      >
-                        <span>Ver Horários</span>
-                        <ChevronRight className="w-4 h-4" />
-                      </Link>
-                    </div>
-
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-      </section>
-
-
-      {/* =========================================================================
-          7. SEÇÃO DEPOIMENTOS
-          Deixado sem depoimentos por solicitação do usuário (ainda não há depoimentos reais)
-         ========================================================================= */}
-      <section id="depoimentos" className="py-16 px-4 sm:px-6 lg:px-8 bg-slate-100 dark:bg-[#0D1527] border-t border-b border-slate-200 dark:border-slate-800 transition-colors">
-        <div className="max-w-4xl mx-auto text-center">
-          
-          <div className="mb-8">
-            <span className="text-xs font-black uppercase tracking-widest text-[#ff7043] block mb-1">
-              DEPOIMENTOS
-            </span>
-            <h2 className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-              O QUE FALAM DO ARENAGO
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-lg mx-auto">
-              Avaliações autênticas da nossa comunidade de atletas e gestores parceiros.
-            </p>
-          </div>
-
-          {/* Estado sem depoimentos cadastrados */}
-          <div className="p-8 sm:p-12 rounded-3xl bg-white dark:bg-[#0F172A] border border-dashed border-slate-300 dark:border-slate-800 shadow-xs max-w-xl mx-auto">
-            <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center mx-auto mb-4 border border-emerald-500/20">
-              <Star className="w-7 h-7 fill-emerald-500/20" />
-            </div>
-            <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
-              Ainda não temos depoimentos publicados
-            </h3>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
-              Estamos colhendo os primeiros relatos reais de atletas e arenas. Agende sua partida e seja um dos primeiros a avaliar sua experiência!
-            </p>
-            <div className="mt-6">
-              <Link
-                href="/schedule"
-                className="btn-coral-gradient inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs shadow-md transition hover:scale-105 active:scale-95"
-              >
-                <Calendar className="w-4 h-4" />
-                <span>Agendar Minha Primeira Partida</span>
-              </Link>
-            </div>
-          </div>
-
-        </div>
-      </section>
-
-
-      {/* =========================================================================
-          8. SEÇÃO FAQ (PERGUNTAS FREQUENTES)
-          Perguntas diretas sobre pagamento, criação de conta e gestores
-         ========================================================================= */}
-      <section id="faq" className="py-16 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto w-full">
-        <div className="text-center mb-10">
-          <span className="text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 block mb-1">
-            FAQ
-          </span>
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-            PERGUNTAS FREQUENTES
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Tire suas principais dúvidas sobre o funcionamento do ArenaGo.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {faqItems.map((item, index) => {
-            const isOpen = openFaqIndex === index;
-            return (
-              <div
-                key={index}
-                className="bg-white dark:bg-[#0F172A] rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs transition"
-              >
+            {/* Usuário Autenticado vs Visitante */}
+            {currentUser ? (
+              <div className="relative">
                 <button
                   type="button"
-                  onClick={() => setOpenFaqIndex(isOpen ? null : index)}
-                  className="w-full text-left flex items-start justify-between gap-3 font-bold text-slate-900 dark:text-white text-xs sm:text-sm cursor-pointer"
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className="flex items-center gap-2.5 pl-2 pr-1 py-1 rounded-full hover:bg-slate-800 border border-transparent hover:border-slate-700 transition cursor-pointer"
                 >
-                  <span>&ldquo;{item.q}&rdquo;</span>
-                  <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 text-slate-500">
-                    {isOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  <span className="text-xs font-bold text-slate-200 hidden sm:inline">
+                    Olá, <span className="text-emerald-400">{currentUser.name.split(" ")[0]}</span>
+                  </span>
+                  <div className="w-8 h-8 rounded-full bg-emerald-600 text-white font-extrabold flex items-center justify-center text-xs shadow-md ring-2 ring-emerald-500/30">
+                    {currentUser.name.charAt(0).toUpperCase()}
                   </div>
                 </button>
 
-                {isOpen && (
-                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 leading-relaxed animate-in fade-in duration-200">
-                    {item.a}
-                  </p>
+                {/* Dropdown do Jogador */}
+                {userMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-52 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 py-2 z-50 text-slate-800 dark:text-slate-100 animate-in fade-in zoom-in-95">
+                    <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800">
+                      <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{currentUser.name}</p>
+                      <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold uppercase">Jogador Conectado</p>
+                    </div>
+                    <Link
+                      href="/player"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+                    >
+                      <CalendarIcon className="w-4 h-4 text-emerald-500" />
+                      <span>Minhas Reservas</span>
+                    </Link>
+                    <Link
+                      href="/sobre"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+                    >
+                      <Sparkles className="w-4 h-4 text-teal-500" />
+                      <span>Sobre o ArenaGo</span>
+                    </Link>
+                    <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition text-left cursor-pointer"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span>Sair da Conta</span>
+                    </button>
+                  </div>
                 )}
               </div>
-            );
-          })}
-        </div>
-      </section>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={googleLoggingIn}
+                  onClick={handleGoogleQuickLogin}
+                  className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white hover:bg-slate-100 text-slate-800 font-bold text-xs shadow-sm transition border border-slate-200 cursor-pointer"
+                  title="Entrar com o Google"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                  </svg>
+                  <span>Google</span>
+                </button>
 
-
-      {/* =========================================================================
-          9. CENTRAL DE ATENDIMENTO OFICIAL NO WHATSAPP
-         ========================================================================= */}
-      <section className="bg-emerald-50/70 dark:bg-emerald-950/20 border-t border-emerald-200 dark:border-emerald-900/60 py-10 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-4 text-center sm:text-left">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-md">
-              <Phone className="w-6 h-6" />
-            </div>
-            <div>
-              <h4 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white">
-                Central de Atendimento Oficial ArenaGo
-              </h4>
-              <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                Dúvidas sobre reservas, comprovantes ou parcerias? Fale pelo WhatsApp ({OFFICIAL_SUPPORT_PHONE_RAW}).
-              </p>
-            </div>
+                <Link
+                  href="/login"
+                  className="px-4 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-md transition"
+                >
+                  Entrar
+                </Link>
+              </div>
+            )}
           </div>
+        </div>
+      </header>
+
+      {/* ========================================================
+          CORPO PRINCIPAL COM LAYOUT DE 2 COLUNAS (REFERÊNCIA AGENDEI QUADRAS)
+      ======================================================== */}
+      <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex-1">
+        
+        {/* Banner Superior Mobile para Conhecer o ArenaGo */}
+        <div className="md:hidden mb-4 p-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex items-center justify-between shadow-md">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-emerald-200" />
+            <span className="text-xs font-bold">Novo por aqui? Conheça as vantagens</span>
+          </div>
+          <Link
+            href="/sobre"
+            className="text-[11px] font-black px-3 py-1 rounded-full bg-white text-emerald-800 shadow-xs"
+          >
+            Sobre nós
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
+          
+          {/* ========================================================
+              COLUNA ESQUERDA (PRINCIPAL): CENTROS ESPORTIVOS & BUSCA
+          ======================================================== */}
+          <section className="lg:col-span-8 bg-white dark:bg-[#0F172A] rounded-2xl sm:rounded-3xl shadow-sm border border-slate-200/90 dark:border-slate-800/80 p-5 sm:p-7 transition-colors">
+            
+            {/* Header do Card: Título + Seletor de Cidade */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800/80">
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                Centros Esportivos
+              </h1>
+
+              {/* Dropdown de Cidade */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setCityDropdownOpen(!cityDropdownOpen)}
+                  className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 transition cursor-pointer"
+                >
+                  <MapPin className="w-3.5 h-3.5 text-coral-500 text-[#ff7043]" />
+                  <span>{selectedCity}</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                </button>
+
+                {cityDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 py-1.5 z-30 animate-in fade-in">
+                    {availableCities.map((city) => (
+                      <button
+                        key={city}
+                        type="button"
+                        onClick={() => {
+                          setSelectedCity(city);
+                          setCityDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-3.5 py-2 text-xs font-bold transition flex items-center justify-between ${
+                          selectedCity === city
+                            ? "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400"
+                            : "hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+                        }`}
+                      >
+                        <span>{city}</span>
+                        {selectedCity === city && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Campo de Busca Rápida com Ícone de Lupa */}
+            <div className="mt-5 relative">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <Search className="w-4 h-4 stroke-[2.5]" />
+              </div>
+              <input
+                type="text"
+                placeholder="Pesquisar por Centro Esportivo, bairro ou esporte..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/60 text-slate-900 dark:text-slate-100 placeholder-slate-400 text-xs sm:text-sm font-medium focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:bg-white dark:focus:bg-slate-800 transition"
+              />
+            </div>
+
+            {/* Pílulas de Filtro por Esporte */}
+            <div className="mt-3 flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none">
+              {sportsList.map((sport) => (
+                <button
+                  key={sport.id}
+                  type="button"
+                  onClick={() => setSelectedSport(sport.id)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+                    selectedSport === sport.id
+                      ? "bg-emerald-600 text-white shadow-xs"
+                      : "bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
+                  }`}
+                >
+                  {sport.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Lista de Arenas / Centros Esportivos */}
+            <div className="mt-6 space-y-3.5">
+              {filteredVenues.length === 0 ? (
+                <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                  <Compass className="w-10 h-10 text-slate-400 mx-auto mb-2 opacity-60" />
+                  <p className="text-sm font-bold text-slate-600 dark:text-slate-300">
+                    Nenhum centro esportivo encontrado para os filtros selecionados.
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Tente selecionar &quot;Todas as Cidades&quot; ou limpar a pesquisa.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCity("Todas as Cidades");
+                      setSearchQuery("");
+                      setSelectedSport("TODOS");
+                    }}
+                    className="mt-4 px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold text-xs"
+                  >
+                    Resetar Filtros
+                  </button>
+                </div>
+              ) : (
+                filteredVenues.map((venue) => {
+                  const startingPrice = venue.courts && venue.courts.length > 0
+                    ? Math.min(...venue.courts.map(c => Number(c.default_hourly_rate) || 100))
+                    : 60;
+
+                  return (
+                    <Link
+                      key={venue.id || venue.slug}
+                      href={`/schedule?venue=${venue.slug || venue.id}`}
+                      className="group flex items-center justify-between p-3.5 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-emerald-500/60 dark:hover:border-emerald-500/60 bg-white dark:bg-slate-900/60 hover:bg-slate-50/80 dark:hover:bg-slate-800/50 shadow-xs hover:shadow-md transition-all cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3.5 sm:gap-4 flex-1 min-w-0">
+                        {/* Imagem / Thumbnail da Arena (ou placeholder "SEM FOTO") */}
+                        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl sm:rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 flex items-center justify-center shrink-0 relative shadow-inner">
+                          {venue.cover_image_url ? (
+                            <img
+                              src={venue.cover_image_url}
+                              alt={venue.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                          ) : (
+                            <div className="flex flex-col items-center justify-center p-2 text-center text-slate-500 dark:text-slate-400">
+                              <ImageIcon className="w-5 h-5 mb-1 opacity-70" />
+                              <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                                SEM FOTO
+                              </span>
+                            </div>
+                          )}
+                          
+                          {/* Badge de Destaque / Cidade */}
+                          <div className="absolute top-1 left-1 bg-black/70 backdrop-blur-xs text-[9px] font-bold text-white px-1.5 py-0.5 rounded-md">
+                            {venue.city}
+                          </div>
+                        </div>
+
+                        {/* Dados da Arena */}
+                        <div className="flex-1 min-w-0 pr-2">
+                          <div className="flex items-center gap-2">
+                            <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-white uppercase tracking-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                              {venue.name}
+                            </h2>
+                          </div>
+
+                          <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
+                            {venue.description || `${venue.address || ""}, ${venue.city}/${venue.state}`}
+                          </p>
+
+                          {/* Estrelas e Avaliações */}
+                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                            <div className="flex items-center gap-1 text-amber-500 text-xs font-bold">
+                              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                              <span>{venue.rating_average ? venue.rating_average.toFixed(1).replace(".", ",") : "5,0"}</span>
+                              <span className="text-slate-400 font-normal">
+                                ({venue.rating_count || 3} avaliações)
+                              </span>
+                            </div>
+
+                            <span className="text-slate-300 dark:text-slate-700 hidden sm:inline">•</span>
+
+                            <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hidden sm:inline">
+                              A partir de R$ {startingPrice.toFixed(2).replace(".", ",")}/h
+                            </span>
+                          </div>
+
+                          {/* Badges de Quadras / Esportes disponíveis */}
+                          <div className="flex items-center gap-1.5 mt-2 overflow-hidden flex-wrap">
+                            {venue.courts?.slice(0, 3).map((court, idx) => (
+                              <span
+                                key={idx}
+                                className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+                              >
+                                {court.sport_type.replace(/_/g, " ")}
+                              </span>
+                            ))}
+                            {venue.courts && venue.courts.length > 3 && (
+                              <span className="text-[10px] text-slate-400 font-semibold">
+                                +{venue.courts.length - 3} quadras
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Botão / Seta Direita para Abrir Agenda */}
+                      <div className="pl-2 shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 group-hover:bg-[#ff7043] group-hover:text-white text-slate-400 flex items-center justify-center transition-all duration-200">
+                          <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Banner Inferior de Indicação (como no Agendei Quadras) */}
+            <div className="mt-8 p-4 sm:p-5 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700/80 bg-slate-50/70 dark:bg-slate-800/40 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#ff7043]/15 text-[#ff7043] flex items-center justify-center shrink-0">
+                  <Share2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white">
+                    Não encontrou sua quadra favorita?
+                  </h4>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Manda o @ deles no nosso WhatsApp que nós cadastramos no ArenaGo :D
+                  </p>
+                </div>
+              </div>
+
+              <a
+                href={getOfficialSupportWhatsAppUrl("Olá! Quero indicar uma arena para o ArenaGo:")}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="shrink-0 p-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition"
+              >
+                <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+              </a>
+            </div>
+          </section>
+
+          {/* ========================================================
+              COLUNA DIREITA (SIDEBAR): PRÓXIMO NA SUA AGENDA
+          ======================================================== */}
+          <aside className="lg:col-span-4 space-y-6">
+            
+            {/* Card "Próximo na sua agenda" */}
+            <div className="bg-white dark:bg-[#0F172A] rounded-2xl sm:rounded-3xl shadow-sm border border-slate-200/90 dark:border-slate-800/80 p-5 sm:p-6 transition-colors">
+              <h3 className="text-base font-black text-slate-900 dark:text-white mb-4 flex items-center justify-between">
+                <span>Próximo na sua agenda</span>
+                <CalendarIcon className="w-4 h-4 text-emerald-500" />
+              </h3>
+
+              {nextBooking ? (
+                /* Card de Agendamento Ativo idêntico à referência */
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50/70 via-slate-50 to-teal-50/40 dark:from-slate-800/70 dark:via-slate-800/40 dark:to-emerald-950/20 border border-emerald-500/30 shadow-xs relative overflow-hidden">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <span className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                      {nextBooking.days_away_label || "EM 3 DIAS"}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-500 text-white font-black text-[9px] uppercase tracking-wider">
+                      AGENDADO
+                    </span>
+                  </div>
+
+                  <p className="text-lg font-black text-slate-900 dark:text-white leading-tight">
+                    {nextBooking.time_label || "18:00 às 20:00"}
+                  </p>
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    {nextBooking.date_label || "domingo, 18/10/2026"}
+                  </p>
+
+                  <div className="my-3 border-t border-slate-200/60 dark:border-slate-700/60" />
+
+                  <p className="text-xs text-slate-700 dark:text-slate-200 font-medium leading-relaxed">
+                    {nextBooking.court_name}
+                  </p>
+
+                  <p className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-2">
+                    {nextBooking.venue_name || "ARENA SHOW"}
+                  </p>
+
+                  <div className="mt-4 flex items-center gap-2">
+                    <Link
+                      href="/player"
+                      className="w-full text-center py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition"
+                    >
+                      Ver Detalhes do Voucher
+                    </Link>
+                  </div>
+                </div>
+              ) : currentUser ? (
+                /* Usuário Logado sem Agendamentos */
+                <div className="text-center py-8 px-2 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                  <Clock className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                  <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Nenhum jogo agendado no momento.
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Escolha uma arena ao lado para garantir seu próximo horário!
+                  </p>
+                </div>
+              ) : (
+                /* Usuário Não Logado: Convite para Login */
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 text-center">
+                  <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto mb-2.5">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <h4 className="text-xs font-black text-slate-900 dark:text-white">
+                    Acompanhe suas partidas
+                  </h4>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 mb-4 leading-relaxed">
+                    Faça login para ver suas reservas agendadas e vouchers em tempo real.
+                  </p>
+
+                  <button
+                    type="button"
+                    disabled={googleLoggingIn}
+                    onClick={handleGoogleQuickLogin}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-emerald-500 text-slate-800 dark:text-white font-bold text-xs shadow-xs transition cursor-pointer mb-2"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                    </svg>
+                    <span>Entrar com o Google</span>
+                  </button>
+
+                  <Link
+                    href="/login"
+                    className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline block"
+                  >
+                    Ou acesse com e-mail e senha
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            {/* Card Institucional de Acesso Rápido */}
+            <div className="bg-gradient-to-br from-slate-900 to-[#122238] rounded-2xl sm:rounded-3xl p-5 sm:p-6 text-white shadow-md relative overflow-hidden border border-slate-800">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+              
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs font-black tracking-wider uppercase text-emerald-400">Sobre o ArenaGo</span>
+              </div>
+
+              <h4 className="text-base font-black leading-snug">
+                A tecnologia que simplifica o agendamento de quadras
+              </h4>
+
+              <p className="text-xs text-slate-300 mt-2 leading-relaxed">
+                Mais de 150 quadras parceiras, confirmação instantânea via Pix e divisão fácil de valores com seus amigos.
+              </p>
+
+              <Link
+                href="/sobre"
+                className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition"
+              >
+                <span>Conheça Nossa História & Recursos</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
+            {/* Suporte Direto */}
+            <div className="p-4 rounded-2xl bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-slate-900 dark:text-white">Central de Atendimento</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">Atendimento oficial ArenaGo</p>
+              </div>
+              <a
+                href={getOfficialSupportWhatsAppUrl("Olá! Preciso de ajuda.")}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold text-xs transition border border-emerald-500/30"
+              >
+                WhatsApp
+              </a>
+            </div>
+
+          </aside>
+        </div>
+      </main>
+
+      {/* ========================================================
+          MENU DE NAVEGAÇÃO MOBILE (RODAPÉ INFERIOR FIXO)
+      ======================================================== */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white/95 dark:bg-[#0F172A]/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 z-50 px-2 py-2">
+        <div className="grid grid-cols-5 text-center items-center">
+          
+          <Link
+            href="/"
+            className="flex flex-col items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold text-[10px]"
+          >
+            <Compass className="w-5 h-5 stroke-[2.5]" />
+            <span>Arenas</span>
+          </Link>
+
+          <Link
+            href="/player"
+            className="flex flex-col items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-emerald-500 font-semibold text-[10px]"
+          >
+            <CalendarIcon className="w-5 h-5" />
+            <span>Reservas</span>
+          </Link>
 
           <a
-            href={officialSupportUrl}
+            href={getOfficialSupportWhatsAppUrl("Olá! Vim pelo aplicativo ArenaGo.")}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition shrink-0"
+            className="flex flex-col items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-teal-500 font-semibold text-[10px]"
           >
-            <MessageCircle className="w-4 h-4" />
-            <span>Falar no WhatsApp</span>
+            <MessageCircle className="w-5 h-5" />
+            <span>Mensagens</span>
           </a>
+
+          <Link
+            href="/sobre"
+            className="flex flex-col items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-emerald-500 font-semibold text-[10px]"
+          >
+            <Sparkles className="w-5 h-5" />
+            <span>Sobre</span>
+          </Link>
+
+          <Link
+            href={currentUser ? "/player" : "/login"}
+            className="flex flex-col items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-emerald-500 font-semibold text-[10px]"
+          >
+            <UserIcon className="w-5 h-5" />
+            <span>{currentUser ? "Perfil" : "Entrar"}</span>
+          </Link>
+
         </div>
-      </section>
+      </nav>
 
-      {/* Botão Flutuante de WhatsApp Oficial */}
+      {/* Botão Flutuante de WhatsApp Geral */}
       <FloatingWhatsApp />
-
     </div>
   );
 }

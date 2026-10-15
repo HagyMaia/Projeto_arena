@@ -25,6 +25,10 @@ class BookingResponse(BaseModel):
     payment_status: str
     notes: Optional[str] = None
     created_at: datetime
+    court_name: Optional[str] = None
+    venue_name: Optional[str] = None
+    venue_address: Optional[str] = None
+    sport_type: Optional[str] = None
 
     class Config:
         from_attributes = True

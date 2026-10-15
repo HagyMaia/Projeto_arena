@@ -30,12 +30,41 @@ async def list_my_bookings(
     db: AsyncSession = Depends(get_db)
 ):
     user_id = payload.get("sub")
+    from app.models.venue import Court
     result = await db.execute(
         select(Booking)
         .where(Booking.user_id == user_id)
+        .options(selectinload(Booking.court).selectinload(Court.venue))
         .order_by(Booking.start_time.desc())
     )
-    return result.scalars().all()
+    bookings = result.scalars().all()
+    out = []
+    for b in bookings:
+        c_name = b.court.name if b.court else None
+        s_type = b.court.sport_type if b.court else None
+        v_name = b.court.venue.name if (b.court and b.court.venue) else None
+        v_addr = f"{b.court.venue.address_street}, n. {b.court.venue.address_number}, {b.court.venue.neighborhood}, {b.court.venue.city} - {b.court.venue.state}" if (b.court and b.court.venue) else None
+        
+        b_res = BookingResponse(
+            id=b.id,
+            court_id=b.court_id,
+            user_id=b.user_id,
+            booking_type=b.booking_type,
+            start_time=b.start_time,
+            end_time=b.end_time,
+            total_amount=b.total_amount,
+            status=b.status,
+            payment_method=b.payment_method,
+            payment_status=b.payment_status,
+            notes=b.notes,
+            created_at=b.created_at,
+            court_name=c_name,
+            venue_name=v_name,
+            venue_address=v_addr,
+            sport_type=s_type
+        )
+        out.append(b_res)
+    return out
 
 
 @router.get("/{booking_id}", response_model=BookingResponse)

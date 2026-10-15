@@ -298,3 +298,162 @@ async def seed_platform_contacts(db: AsyncSession):
         logger.warning(f"Erro ao sincronizar contato oficial de WhatsApp: {e}")
         await db.rollback()
 
+
+async def seed_venues_catalog(db: AsyncSession):
+    """
+    Garante que as arenas de Manaus (ARENA SHOW e ARENA EDGOL) estejam no banco,
+    atendendo perfeitamente à experiência demonstrada nas referências.
+    """
+    try:
+        # 1. Checa ou cria organização para Manaus
+        stmt = select(Organization).where(Organization.name == "Arenas Manaus Sports")
+        res = await db.execute(stmt)
+        org = res.scalars().first()
+        if not org:
+            org = Organization(
+                name="Arenas Manaus Sports",
+                legal_name="Arenas Manaus Esportes e Eventos Ltda",
+                document_number="34.567.890/0001-23",
+                phone="+55 92 98492-3316",
+                email="contato@arenasmanaus.com.br"
+            )
+            db.add(org)
+            await db.flush()
+
+        # 2. Arena Show
+        stmt_show = select(Venue).where(Venue.slug == "arena-show")
+        res_show = await db.execute(stmt_show)
+        show = res_show.scalars().first()
+        if not show:
+            logger.info("Sincronizando ARENA SHOW (Manaus/AM)...")
+            show = Venue(
+                organization_id=org.id,
+                name="ARENA SHOW",
+                slug="arena-show",
+                description="Arena Esportiva com campo society sintético e quadras de vôlei e Praça de Alimentação...",
+                phone="+55 92 98492-3316",
+                address_street="Avenida Natan Xavier",
+                address_number="1685",
+                neighborhood="Novo Aleixo",
+                city="Manaus",
+                state="AM",
+                postal_code="69098-000",
+                latitude=-3.0558,
+                longitude=-59.9868,
+                cover_image_url="https://images.unsplash.com/photo-1529900748604-07564a03e7a6?auto=format&fit=crop&w=800&q=80",
+                rating_average=5.0,
+                rating_count=3,
+                is_active=True
+            )
+            db.add(show)
+            await db.flush()
+
+            for day in range(7):
+                db.add(OperatingHour(venue_id=show.id, day_of_week=day, open_time=time(7, 0), close_time=time(23, 0)))
+
+            c1 = Court(
+                venue_id=show.id,
+                name="Campo Rei Pelé - Society Coberto",
+                sport_type="FOOTBALL",
+                surface="SYNTHETIC_GRASS",
+                is_indoor=True,
+                default_hourly_rate=Decimal("120.00"),
+                is_active=True
+            )
+            c2 = Court(
+                venue_id=show.id,
+                name="Quadra de Areia 1 - 8 x 16 m de jogo (Areia Coberta)",
+                sport_type="BEACH_TENNIS",
+                surface="SAND",
+                is_indoor=True,
+                default_hourly_rate=Decimal("60.00"),
+                is_active=True
+            )
+            c3 = Court(
+                venue_id=show.id,
+                name="Quadra de Areia 2 - Beach Tennis e Futevôlei",
+                sport_type="BEACH_TENNIS",
+                surface="SAND",
+                is_indoor=True,
+                default_hourly_rate=Decimal("60.00"),
+                is_active=True
+            )
+            db.add_all([c1, c2, c3])
+
+            db.add(WhatsAppContact(
+                venue_id=show.id,
+                department="Reservas & Recepção",
+                label="Atendimento Arena Show",
+                phone_number="+55 92 98492-3316",
+                custom_message="Olá! Vim pelo ArenaGo e quero agendar na ARENA SHOW.",
+                is_primary=True,
+                is_active=True
+            ))
+
+        # 3. Arena Edgol
+        stmt_edgol = select(Venue).where(Venue.slug == "arena-edgol")
+        res_edgol = await db.execute(stmt_edgol)
+        edgol = res_edgol.scalars().first()
+        if not edgol:
+            logger.info("Sincronizando ARENA EDGOL (Manaus/AM)...")
+            edgol = Venue(
+                organization_id=org.id,
+                name="ARENA EDGOL",
+                slug="arena-edgol",
+                description="Campo sintético e estrutura completa para eventos esportivos e confraternizações.",
+                phone="+55 92 98492-3316",
+                address_street="Rua Rita Gama Barros",
+                address_number="10",
+                neighborhood="Alvorada",
+                city="Manaus",
+                state="AM",
+                postal_code="69040-000",
+                latitude=-3.0800,
+                longitude=-60.0350,
+                cover_image_url="https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=800&q=80",
+                rating_average=5.0,
+                rating_count=7,
+                is_active=True
+            )
+            db.add(edgol)
+            await db.flush()
+
+            for day in range(7):
+                db.add(OperatingHour(venue_id=edgol.id, day_of_week=day, open_time=time(7, 0), close_time=time(23, 0)))
+
+            ec1 = Court(
+                venue_id=edgol.id,
+                name="Campo Society 1",
+                sport_type="FOOTBALL",
+                surface="SYNTHETIC_GRASS",
+                is_indoor=False,
+                default_hourly_rate=Decimal("130.00"),
+                is_active=True
+            )
+            ec2 = Court(
+                venue_id=edgol.id,
+                name="Campo Society 2",
+                sport_type="FOOTBALL",
+                surface="SYNTHETIC_GRASS",
+                is_indoor=False,
+                default_hourly_rate=Decimal("130.00"),
+                is_active=True
+            )
+            db.add_all([ec1, ec2])
+
+            db.add(WhatsAppContact(
+                venue_id=edgol.id,
+                department="Reservas",
+                label="Atendimento Arena Edgol",
+                phone_number="+55 92 98492-3316",
+                custom_message="Olá! Vim pelo ArenaGo e quero agendar na ARENA EDGOL.",
+                is_primary=True,
+                is_active=True
+            ))
+
+        await db.commit()
+    except Exception as e:
+        logger.warning(f"Erro ao sincronizar catálogo de arenas: {e}")
+        await db.rollback()
+
+

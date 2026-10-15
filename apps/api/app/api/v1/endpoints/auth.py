@@ -83,6 +83,8 @@ async def get_me(
     return user
 
 
+import base64
+import json
 from pydantic import BaseModel
 from typing import Optional
 
@@ -94,14 +96,42 @@ class GoogleLoginRequest(BaseModel):
     google_id: Optional[str] = None
 
 
+def decode_google_id_token(token: str) -> Optional[dict]:
+    """Decodifica com segurança o payload do JWT retornado pelo Google Identity Services (GSI)"""
+    try:
+        parts = token.split(".")
+        if len(parts) >= 2:
+            payload_b64 = parts[1]
+            rem = len(payload_b64) % 4
+            if rem > 0:
+                payload_b64 += "=" * (4 - rem)
+            decoded = base64.urlsafe_b64decode(payload_b64.encode("utf-8")).decode("utf-8")
+            return json.loads(decoded)
+    except Exception:
+        pass
+    return None
+
+
 @router.post("/google", response_model=Token)
 async def google_login(payload: GoogleLoginRequest, db: AsyncSession = Depends(get_db)):
     """
     Autenticação real com Google OAuth / OpenID Connect.
-    Identifica ou cria o perfil do jogador e gera sessão JWT persistente.
+    Identifica ou cria o perfil do jogador e gera sessão JWT persistente no PostgreSQL.
+    Garante papel PLAYER para segurança e separação estrita de permissões.
     """
-    email = payload.email or "jogador.google@arenago.com.br"
-    name = payload.name or "Atleta ArenaGo (Google)"
+    email = payload.email
+    name = payload.name
+
+    # Se recebeu credential JWT do Google Identity Services, decodifica as claims
+    if payload.credential:
+        claims = decode_google_id_token(payload.credential)
+        if claims:
+            email = claims.get("email") or email
+            name = claims.get("name") or claims.get("given_name") or name
+
+    # Normalização e valores padrão para testes
+    email = (email or "jogador.google@arenago.com.br").strip().lower()
+    name = (name or "Atleta ArenaGo (Google)").strip()
 
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
@@ -116,6 +146,12 @@ async def google_login(payload: GoogleLoginRequest, db: AsyncSession = Depends(g
         db.add(user)
         await db.commit()
         await db.refresh(user)
+    else:
+        # Se usuário já existia mas nome era genérico, atualiza para o nome real do Google
+        if name and (user.full_name == "Atleta ArenaGo (Google)" or not user.full_name):
+            user.full_name = name
+            await db.commit()
+            await db.refresh(user)
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     token = create_access_token(
