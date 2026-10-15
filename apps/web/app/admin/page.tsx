@@ -708,19 +708,23 @@ export default function SuperAdminPage() {
   const createFinal = Math.max(0, Math.round((createBase - createDiscVal) * 100) / 100);
 
   return (
-    <div className="min-h-screen bg-[#0d131f] text-slate-100 p-6 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen bg-[#0d131f] text-slate-100 p-6 md:p-8 relative overflow-hidden">
+      {/* Ambient glowing sports orbs */}
+      <div className="absolute top-0 right-0 -mr-24 -mt-24 w-96 h-96 bg-[#ff7043]/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-72 left-0 -ml-24 w-96 h-96 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="max-w-7xl mx-auto space-y-8 relative z-10">
         
         {/* Top Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-800/80 pb-6">
           <div>
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-gradient-to-tr from-emerald-500/20 to-teal-500/10 border border-emerald-500/30 text-emerald-400 shadow-inner">
+              <div className="p-2.5 rounded-xl bg-gradient-to-tr from-emerald-500/20 via-teal-500/20 to-coral-500/20 border border-emerald-500/30 text-emerald-400 shadow-inner">
                 <ShieldCheck className="w-6 h-6" />
               </div>
               <div>
-                <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white flex items-center gap-2">
-                  Painel SuperAdmin <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-widest font-semibold">SaaS Master</span>
+                <h1 className="text-2xl md:text-3xl font-black tracking-tight text-white flex items-center gap-2">
+                  <span className="text-sports-gradient">Painel SuperAdmin</span> <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-widest font-semibold">SaaS Master</span>
                 </h1>
                 <p className="text-sm text-slate-400 mt-0.5">
                   Gestão global de arenas, proprietários, fotos, precificação dinâmica e faturamento MRR.
@@ -763,7 +767,7 @@ export default function SuperAdminPage() {
 
             <button
               onClick={() => setIsCreateModalOpen(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-semibold text-sm shadow-lg shadow-emerald-500/20 transition transform active:scale-95"
+              className="btn-coral-gradient inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition transform active:scale-95 shadow-lg shadow-coral-500/20"
             >
               <Plus className="w-4 h-4" />
               Cadastrar Nova Arena & Dono

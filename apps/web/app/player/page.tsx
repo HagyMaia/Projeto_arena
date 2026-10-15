@@ -116,14 +116,15 @@ function PlayerPortalContent() {
         )}
 
         {/* Banner de Boas-vindas / Estatísticas */}
-        <div className="bg-white dark:bg-[#0F172A] rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 p-6 mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors">
+        <div className="bg-white dark:bg-[#0F172A] rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 p-6 mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors relative overflow-hidden">
+          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-[#ff7043]" />
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-2xl font-black shrink-0">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500/20 via-teal-500/20 to-[#ff7043]/20 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-2xl font-black shrink-0">
               {currentUser ? currentUser.name.charAt(0).toUpperCase() : <UserIcon className="w-7 h-7" />}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
+                <h1 className="text-xl sm:text-2xl font-black text-sports-gradient">
                   {currentUser ? `Olá, ${currentUser.name}` : "Portal do Jogador ArenaGo"}
                 </h1>
                 {currentUser && (
@@ -142,7 +143,7 @@ function PlayerPortalContent() {
 
           <Link
             href="/"
-            className="bg-[#059669] hover:bg-[#047857] text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-md transition-all hover:scale-102 flex items-center justify-center gap-2 shrink-0 shadow-emerald-900/20"
+            className="btn-coral-gradient font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer"
           >
             <PlusCircle className="w-4 h-4" />
             <span>Agendar Nova Partida</span>
@@ -159,7 +160,8 @@ function PlayerPortalContent() {
 
         {/* Caso o Jogador NÃO esteja autenticado */}
         {!currentUser ? (
-          <div className="bg-white dark:bg-[#0F172A] rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-8 text-center max-w-md mx-auto transition-colors">
+          <div className="bg-white dark:bg-[#0F172A] rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-8 text-center max-w-md mx-auto transition-colors relative overflow-hidden">
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-[#ff7043]" />
             <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto mb-3">
               <LogIn className="w-6 h-6" />
             </div>
@@ -173,7 +175,7 @@ function PlayerPortalContent() {
                 type="button"
                 disabled={quickLoginLoading}
                 onClick={handleQuickLoginPlayer}
-                className="w-full bg-[#059669] hover:bg-[#047857] text-white font-bold py-2.5 px-4 rounded-xl text-xs sm:text-sm shadow-md transition cursor-pointer shadow-emerald-900/20"
+                className="w-full btn-coral-gradient font-bold py-2.5 px-4 rounded-xl text-xs sm:text-sm shadow-md transition cursor-pointer"
               >
                 {quickLoginLoading ? "Entrando..." : "1-Clique: Entrar como Lucas Ferreira (Jogador Demo)"}
               </button>

@@ -191,6 +191,8 @@ function LoginContent() {
         <div className="bg-gradient-to-br from-[#0F172A] via-[#132238] to-[#047857] p-6 sm:p-8 flex flex-col justify-between relative overflow-hidden text-white min-h-[460px]">
           {/* Subtle sport icon pattern in background */}
           <div className="absolute inset-0 opacity-15 bg-[radial-gradient(circle_at_20%_20%,white_2px,transparent_3px)] [background-size:24px_24px] pointer-events-none" />
+          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-[#ff7043]/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
 
           {/* Collage of 4 sports photos + rounded badges */}
           <div className="relative z-10 grid grid-cols-2 gap-4 h-full items-center">
@@ -213,7 +215,7 @@ function LoginContent() {
               </div>
 
               {/* Badge 3 */}
-              <div className="bg-white dark:bg-slate-900 text-[#059669] dark:text-emerald-400 font-black text-[11px] sm:text-xs uppercase px-3 py-1.5 rounded-md shadow inline-block border border-slate-100 dark:border-slate-800">
+              <div className="bg-white dark:bg-slate-900 text-[#ff7043] font-black text-[11px] sm:text-xs uppercase px-3 py-1.5 rounded-md shadow inline-block border border-slate-100 dark:border-slate-800">
                 conectando
                 <span className="block text-slate-900 dark:text-white font-black">PESSOAS</span>
               </div>
@@ -255,7 +257,7 @@ function LoginContent() {
               </div>
 
               {/* Badge 4 */}
-              <div className="bg-white dark:bg-slate-900 text-[#059669] dark:text-emerald-400 font-black text-[11px] sm:text-xs uppercase px-3 py-1.5 rounded-md shadow inline-block border border-slate-100 dark:border-slate-800">
+              <div className="bg-white dark:bg-slate-900 text-[#ff7043] font-black text-[11px] sm:text-xs uppercase px-3 py-1.5 rounded-md shadow inline-block border border-slate-100 dark:border-slate-800">
                 através do
                 <span className="block text-slate-900 dark:text-white font-black">ESPORTE!</span>
               </div>
@@ -268,13 +270,13 @@ function LoginContent() {
         <div className="p-8 sm:p-12 flex flex-col justify-center items-center text-center bg-white dark:bg-[#0F172A] transition-colors">
           
           {/* Logo Stadium/Calendar Icon */}
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#059669] to-[#047857] text-white flex flex-col items-center justify-center shadow-lg shadow-emerald-500/20 mb-3">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 via-teal-600 to-[#ff7043] text-white flex flex-col items-center justify-center shadow-lg shadow-emerald-500/20 mb-3">
             <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 px-2 rounded-full mb-0.5">arena</span>
             <CalendarIcon className="w-6 h-6 stroke-[2.5]" />
           </div>
 
-          <h2 className="text-3xl font-black text-[#059669] tracking-tight">
-            Arena<span className="text-slate-900 dark:text-white">Go</span>
+          <h2 className="text-3xl font-black text-sports-gradient tracking-tight">
+            ArenaGo
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium mb-4">
             Conectamos você com o esporte!
@@ -285,9 +287,9 @@ function LoginContent() {
             <button
               type="button"
               onClick={() => { setActivePortal("client"); setErrorMsg(""); }}
-              className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
                 activePortal === "client"
-                  ? "bg-emerald-600 text-white shadow-xs"
+                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-xs"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
@@ -296,9 +298,9 @@ function LoginContent() {
             <button
               type="button"
               onClick={() => { setActivePortal("admin"); setErrorMsg(""); }}
-              className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
                 activePortal === "admin"
-                  ? "bg-[#0F172A] text-white shadow-xs"
+                  ? "bg-slate-900 dark:bg-slate-800 text-white shadow-xs"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
@@ -398,7 +400,7 @@ function LoginContent() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 px-4 rounded-xl bg-[#059669] hover:bg-[#047857] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition shadow-md shadow-emerald-600/20"
+                className="w-full py-3.5 px-4 rounded-xl btn-coral-gradient text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition shadow-lg cursor-pointer"
               >
                 {loading ? "Entrando..." : "Acessar ArenaGo"}
                 <ArrowRight className="w-4 h-4" />
@@ -408,14 +410,14 @@ function LoginContent() {
                 <button
                   type="button"
                   onClick={() => setStep("EMAIL")}
-                  className="text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-semibold underline"
+                  className="text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-semibold underline cursor-pointer"
                 >
                   Trocar e-mail
                 </button>
                 <button
                   type="button"
                   onClick={() => { setForgotEmail(email); setForgotModal(true); }}
-                  className="text-[#059669] dark:text-emerald-400 hover:underline font-semibold"
+                  className="text-coral-500 hover:underline font-semibold cursor-pointer"
                 >
                   Esqueceu a senha?
                 </button>
@@ -425,7 +427,7 @@ function LoginContent() {
                 <button
                   type="button"
                   onClick={() => setStep("REGISTER")}
-                  className="text-xs text-slate-600 dark:text-slate-400 hover:text-[#059669] dark:hover:text-emerald-400 font-bold"
+                  className="text-xs text-slate-600 dark:text-slate-400 hover:text-coral-500 dark:hover:text-coral-400 font-bold cursor-pointer"
                 >
                   Não tem conta? Cadastre-se
                 </button>
@@ -464,7 +466,7 @@ function LoginContent() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 px-4 rounded-xl bg-[#059669] hover:bg-[#047857] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition shadow-md shadow-emerald-600/20"
+                className="w-full py-3.5 px-4 rounded-xl btn-coral-gradient text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition shadow-lg cursor-pointer"
               >
                 {loading ? "Cadastrando..." : "Criar Conta Gratuita"}
                 <ArrowRight className="w-4 h-4" />

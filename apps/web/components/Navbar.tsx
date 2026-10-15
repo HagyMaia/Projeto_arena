@@ -229,7 +229,6 @@ export default function Navbar() {
     { href: "/", label: "Centros Esportivos", icon: Trophy, active: pathname === "/" },
     { href: "/schedule", label: "Agendar Partida", icon: Calendar, active: pathname.startsWith("/schedule") },
     { href: "/#novidades", label: "Novidades", icon: Sparkles, active: false },
-    { href: "/sobre", label: "Sobre o ArenaGo", icon: Info, active: pathname.startsWith("/sobre") },
     { href: "/player", label: isPlayer ? "Minhas Reservas" : "Portal do Jogador", icon: UserIcon, active: pathname.startsWith("/player") },
   ];
 
@@ -311,13 +310,13 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo Brand */}
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-md shadow-emerald-600/20 group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 via-teal-600 to-[#ff7043] flex items-center justify-center text-white shadow-md shadow-emerald-600/25 group-hover:scale-105 transition-transform">
               <span className="font-extrabold text-xl tracking-tighter">AG</span>
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-bold text-xl text-slate-900 dark:text-white tracking-tight">
-                  Arena<span className="text-emerald-600 dark:text-emerald-400">Go</span>
+                <span className="font-black text-xl text-slate-900 dark:text-white tracking-tight">
+                  Arena<span className="text-sports-gradient">Go</span>
                 </span>
                 <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300">
                   {isAdmin ? "admin" : "v1.0"}
@@ -339,7 +338,7 @@ export default function Navbar() {
                   href={link.href}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs lg:text-sm font-medium transition-colors ${
                     link.active
-                      ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 font-semibold"
+                      ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 font-bold border-b-2 border-emerald-500"
                       : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
                   }`}
                 >
@@ -370,16 +369,16 @@ export default function Navbar() {
               <>
                 <Link
                   href="/login?portal=admin"
-                  className="hidden xl:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-orange-500/30 bg-orange-500/10 hover:bg-orange-500/20 text-xs font-semibold text-orange-600 dark:text-orange-400 transition"
+                  className="hidden xl:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#ff7043]/30 bg-[#ff7043]/10 hover:bg-[#ff7043]/20 text-xs font-semibold text-[#f4511e] dark:text-[#ff7043] transition"
                   title="Tem uma arena ou centro esportivo? Cadastre-se na plataforma"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-orange-500" />
+                  <Sparkles className="w-3.5 h-3.5 text-[#ff7043]" />
                   <span>Cadastre sua Quadra</span>
                 </Link>
 
                 <Link
                   href="/login"
-                  className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-xs font-bold text-white transition shadow-xs"
+                  className="hidden sm:inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full btn-coral-gradient text-xs font-bold text-white transition shadow-sm"
                 >
                   <LogIn className="w-3.5 h-3.5" />
                   <span>Entrar</span>
@@ -740,7 +739,7 @@ export default function Navbar() {
               <Link
                 href="/login"
                 onClick={() => setMobileMenuOpen(false)}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-600 text-white font-semibold text-xs shadow-md shadow-emerald-600/20"
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl btn-coral-gradient text-white font-bold text-xs shadow-md"
               >
                 <LogIn className="w-4 h-4" />
                 Acessar Plataforma / Login

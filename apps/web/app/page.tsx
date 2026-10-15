@@ -38,6 +38,7 @@ import {
 import { api, Venue, getStoredUser } from "@/lib/api";
 import { getOfficialSupportWhatsAppUrl, OFFICIAL_SUPPORT_PHONE_RAW } from "@/lib/utils";
 import { FloatingWhatsApp } from "@/components/FloatingWhatsApp";
+import { MobileAppGallery } from "@/components/MobileAppGallery";
 
 // Svg Icons matching the reference site screenshot
 function PixDiamondIcon({ className = "w-10 h-10" }: { className?: string }) {
@@ -167,29 +168,8 @@ export default function MarketplaceHomePage() {
     { label: "Futsal", value: "FUTSAL" },
   ];
 
-  const testimonials = [
-    {
-      name: "Leonardo Leonel",
-      role: "Atleta de Society & Futsal",
-      text: "O aplicativo me facilitou o agendamento de jogos, me fez ganhar agilidade e praticidade, não perco mais tempo ligando ou esperando respostas de mensagens, apenas abro o site e marco o horário em tempo real! Aplicativo completo e confiável.",
-      stars: 5,
-      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80"
-    },
-    {
-      name: "Lucas Corrêa",
-      role: "Jogador de Beach Tennis",
-      text: "O ArenaGo ajuda muito com relação ao feedback rápido de horários disponíveis. Consigo verificar e agendar com mais praticidade sem a necessidade de esperar a recepção da quadra responder, onde muitas vezes o contato demora.",
-      stars: 5,
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80"
-    },
-    {
-      name: "Victor Posser",
-      role: "Organizador de Rachão Semanal",
-      text: "Facilitou muito agendar meus horários de society que jogo toda semana com a turma da empresa. Além de agendar com Pix na hora, posso também ver o histórico completo dos meus agendamentos e comprovantes salvos.",
-      stars: 5,
-      avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80"
-    }
-  ];
+  // Deixado sem depoimentos por solicitação do usuário (ainda não há depoimentos reais cadastrados)
+  const testimonials: { name: string; role: string; text: string; stars: number; avatar: string }[] = [];
 
   const faqItems = [
     {
@@ -700,6 +680,12 @@ export default function MarketplaceHomePage() {
         </div>
       </section>
 
+      {/* =========================================================================
+          GALERIA: CONHEÇA O APP ARENAGO (Display Triplo de Smartphones com Movimento)
+          Fiel à captura de tela enviada pelo usuário com os 3 celulares e movimentos
+         ========================================================================= */}
+      <MobileAppGallery />
+
 
       {/* =========================================================================
           5. FAIXA BAIXE O APP GRÁTIS! (Cor Laranja / Coral Vibrante)
@@ -926,13 +912,13 @@ export default function MarketplaceHomePage() {
 
 
       {/* =========================================================================
-          7. SEÇÃO DEPOIMENTOS (O QUE FALAM DO ARENAGO)
-          Depoimentos reais de atletas elogiando a agilidade e praticidade
+          7. SEÇÃO DEPOIMENTOS
+          Deixado sem depoimentos por solicitação do usuário (ainda não há depoimentos reais)
          ========================================================================= */}
       <section id="depoimentos" className="py-16 px-4 sm:px-6 lg:px-8 bg-slate-100 dark:bg-[#0D1527] border-t border-b border-slate-200 dark:border-slate-800 transition-colors">
-        <div className="max-w-6xl mx-auto text-center">
+        <div className="max-w-4xl mx-auto text-center">
           
-          <div className="mb-12">
+          <div className="mb-8">
             <span className="text-xs font-black uppercase tracking-widest text-[#ff7043] block mb-1">
               DEPOIMENTOS
             </span>
@@ -940,44 +926,30 @@ export default function MarketplaceHomePage() {
               O QUE FALAM DO ARENAGO
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-lg mx-auto">
-              Veja a opinião de quem joga e agenda semanalmente em nossas quadras.
+              Avaliações autênticas da nossa comunidade de atletas e gestores parceiros.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {testimonials.map((item, idx) => (
-              <div 
-                key={idx}
-                className="p-6 rounded-3xl bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between text-left"
+          {/* Estado sem depoimentos cadastrados */}
+          <div className="p-8 sm:p-12 rounded-3xl bg-white dark:bg-[#0F172A] border border-dashed border-slate-300 dark:border-slate-800 shadow-xs max-w-xl mx-auto">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center mx-auto mb-4 border border-emerald-500/20">
+              <Star className="w-7 h-7 fill-emerald-500/20" />
+            </div>
+            <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+              Ainda não temos depoimentos publicados
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+              Estamos colhendo os primeiros relatos reais de atletas e arenas. Agende sua partida e seja um dos primeiros a avaliar sua experiência!
+            </p>
+            <div className="mt-6">
+              <Link
+                href="/schedule"
+                className="btn-coral-gradient inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs shadow-md transition hover:scale-105 active:scale-95"
               >
-                <div>
-                  <div className="flex items-center gap-1 text-amber-400 mb-3">
-                    {[...Array(item.stars)].map((_, i) => (
-                      <Star key={i} className="w-4 h-4 fill-amber-400" />
-                    ))}
-                  </div>
-                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed italic">
-                    &ldquo;{item.text}&rdquo;
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-3 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
-                  <img 
-                    src={item.avatar} 
-                    alt={item.name} 
-                    className="w-10 h-10 rounded-full object-cover border border-emerald-500/40"
-                  />
-                  <div>
-                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                      {item.name}
-                    </h4>
-                    <span className="text-[11px] text-[#ff7043] font-semibold">
-                      {item.role}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
+                <Calendar className="w-4 h-4" />
+                <span>Agendar Minha Primeira Partida</span>
+              </Link>
+            </div>
           </div>
 
         </div>

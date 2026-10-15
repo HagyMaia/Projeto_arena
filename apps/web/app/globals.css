@@ -6,6 +6,8 @@
   --foreground-rgb: 15, 23, 42;
   --background-start-rgb: 248, 250, 252;
   --background-end-rgb: 255, 255, 255;
+  --coral-primary: #ff7043;
+  --emerald-primary: #10b981;
 }
 
 html.dark {
@@ -20,11 +22,96 @@ body {
   background: rgb(var(--background-start-rgb));
   min-height: 100vh;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 html.dark body {
   background-color: #0B1220;
   color: #F8FAFC;
+}
+
+/* =========================================================================
+   ARENAGO SPORTS SIGNATURE GRADIENT UTILITIES (Light & Dark Modes)
+   Fusão cromática harmônica: Esmeralda / Menta -> Teal -> Coral Vibrante
+   ========================================================================= */
+
+.text-sports-gradient {
+  background-image: linear-gradient(135deg, #059669 0%, #0d9488 45%, #ff7043 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  display: inline-block;
+}
+
+html.dark .text-sports-gradient {
+  background-image: linear-gradient(135deg, #34d399 0%, #2dd4bf 45%, #ff7043 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.bg-sports-gradient {
+  background-image: linear-gradient(135deg, #059669 0%, #0d9488 50%, #ff7043 100%);
+}
+
+html.dark .bg-sports-gradient {
+  background-image: linear-gradient(135deg, #10b981 0%, #14b8a6 50%, #ff7043 100%);
+}
+
+.btn-coral-gradient {
+  background: linear-gradient(135deg, #ff7043 0%, #f97316 100%);
+  color: #ffffff;
+  font-weight: 700;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 14px 0 rgba(255, 112, 67, 0.35);
+}
+
+.btn-coral-gradient:hover {
+  background: linear-gradient(135deg, #f4511e 0%, #ea580c 100%);
+  box-shadow: 0 6px 20px 0 rgba(255, 112, 67, 0.45);
+  transform: translateY(-1px);
+}
+
+.btn-coral-gradient:active {
+  transform: translateY(0);
+}
+
+.btn-emerald-gradient {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  color: #ffffff;
+  font-weight: 700;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.35);
+}
+
+.btn-emerald-gradient:hover {
+  background: linear-gradient(135deg, #047857 0%, #059669 100%);
+  box-shadow: 0 6px 20px 0 rgba(16, 185, 129, 0.45);
+  transform: translateY(-1px);
+}
+
+.badge-sports-coral {
+  background-color: rgba(255, 112, 67, 0.12);
+  border: 1px solid rgba(255, 112, 67, 0.3);
+  color: #ea580c;
+}
+
+html.dark .badge-sports-coral {
+  background-color: rgba(255, 112, 67, 0.16);
+  border: 1px solid rgba(255, 112, 67, 0.35);
+  color: #ff8a65;
+}
+
+.badge-sports-emerald {
+  background-color: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #047857;
+}
+
+html.dark .badge-sports-emerald {
+  background-color: rgba(16, 185, 129, 0.16);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #6ee7b7;
 }
 
 /* Custom scrollbar */
@@ -35,10 +122,17 @@ html.dark body {
 ::-webkit-scrollbar-track {
   background: #f1f5f9;
 }
+html.dark ::-webkit-scrollbar-track {
+  background: #0B1220;
+}
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 4px;
 }
+html.dark ::-webkit-scrollbar-thumb {
+  background: #1E293B;
+  border-radius: 4px;
+}
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #ff7043;
 }

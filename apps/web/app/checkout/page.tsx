@@ -348,7 +348,7 @@ function CheckoutContent() {
               <ChevronLeft className="w-6 h-6 stroke-[2.5]" />
             </button>
 
-            <h1 className="text-xl sm:text-2xl font-black text-emerald-700 dark:text-emerald-400 tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-black text-sports-gradient tracking-tight">
               Finalize seu Agendamento
             </h1>
           </div>
@@ -585,7 +585,8 @@ function CheckoutContent() {
                 COLUNA 3: RESUMO DO HORÁRIO AVULSO
             ======================================================== */}
             <div className="lg:col-span-4">
-              <div className="bg-white dark:bg-slate-900 rounded-xl border-t-4 border-t-emerald-600 border border-slate-200 dark:border-slate-800 shadow-md p-4 sm:p-5">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl p-4 sm:p-5 relative overflow-hidden">
+                <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-[#ff7043]" />
                 
                 <h2 className="text-sm font-black text-slate-900 dark:text-white mb-3 pb-2 border-b border-slate-100 dark:border-slate-800">
                   Resumo do Horário Avulso
@@ -690,7 +691,7 @@ function CheckoutContent() {
                   </div>
 
                   {totalDiscounts > 0 && (
-                    <div className="flex justify-between font-bold text-emerald-600 dark:text-emerald-400">
+                    <div className="flex justify-between font-bold text-[#ff7043] dark:text-[#ff7043]">
                       <span>Desconto</span>
                       <span>- R$ {totalDiscounts.toFixed(2).replace(".", ",")}</span>
                     </div>
@@ -698,7 +699,7 @@ function CheckoutContent() {
 
                   <div className="flex justify-between text-base font-black text-slate-900 dark:text-white pt-2 border-t border-slate-200 dark:border-slate-800">
                     <span>Você irá pagar</span>
-                    <span className="text-emerald-600 dark:text-emerald-400">R$ {finalToPay.toFixed(2).replace(".", ",")}</span>
+                    <span className="text-sports-gradient font-black">R$ {finalToPay.toFixed(2).replace(".", ",")}</span>
                   </div>
                 </div>
 
@@ -719,10 +720,10 @@ function CheckoutContent() {
                   type="button"
                   disabled={!paymentMethod || isProcessing}
                   onClick={handlePrimaryButtonClick}
-                  className={`w-full mt-4 py-3 px-4 rounded-xl font-bold text-xs sm:text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                  className={`w-full mt-4 py-3.5 px-4 rounded-xl font-bold text-xs sm:text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 ${
                     !paymentMethod || isProcessing
                       ? "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed"
-                      : "bg-[#059669] hover:bg-[#047857] text-white hover:scale-102 active:scale-98 shadow-emerald-900/20"
+                      : "btn-coral-gradient hover:scale-[1.01] active:scale-[0.99] shadow-lg"
                   }`}
                 >
                   {isProcessing ? (
@@ -831,7 +832,7 @@ function CheckoutContent() {
               type="button"
               disabled={isProcessing}
               onClick={handleExecutePayment}
-              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full btn-emerald-gradient text-white font-bold py-3.5 rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>Confirmar Pagamento Realizado</span>
@@ -922,7 +923,7 @@ function CheckoutContent() {
               type="button"
               disabled={isProcessing}
               onClick={handleExecutePayment}
-              className="w-full bg-[#059669] hover:bg-[#047857] text-white font-bold py-3 rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer shadow-emerald-900/20"
+              className="w-full btn-coral-gradient text-white font-bold py-3.5 rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Check className="w-4 h-4 stroke-[3]" />
               <span>Confirmar Pagamento de R$ {finalToPay.toFixed(2).replace(".", ",")}</span>
@@ -936,7 +937,8 @@ function CheckoutContent() {
       ======================================================== */}
       {confirmedBooking && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 animate-in zoom-in-95">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 sm:p-8 text-slate-800 dark:text-slate-100 shadow-2xl relative border-t-8 border-t-emerald-500 border border-slate-200 dark:border-slate-800">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 sm:p-8 text-slate-800 dark:text-slate-100 shadow-2xl relative border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-emerald-500 via-teal-500 to-[#ff7043]" />
             
             <div className="text-center mb-6">
               <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto mb-3">

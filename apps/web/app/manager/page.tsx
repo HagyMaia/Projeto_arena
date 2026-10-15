@@ -376,8 +376,12 @@ export default function ManagerDashboardPage() {
   return (
     <div className="min-h-screen bg-slate-100/60 dark:bg-[#0B1220] text-slate-900 dark:text-slate-100 pb-16 transition-colors">
       {/* Top Banner with Arena info & KPI Cards */}
-      <section className="bg-slate-900 dark:bg-slate-950 text-white border-b border-slate-800 pt-8 pb-12 px-4 sm:px-6 lg:px-8 shadow-md">
-        <div className="max-w-7xl mx-auto">
+      <section className="bg-slate-900 dark:bg-slate-950 text-white border-b border-slate-800 pt-8 pb-12 px-4 sm:px-6 lg:px-8 shadow-md relative overflow-hidden">
+        {/* Ambient glowing orbs */}
+        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-80 h-80 bg-[#ff7043]/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="max-w-7xl mx-auto relative z-10">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div>
               <div className="flex items-center gap-2">
@@ -387,7 +391,7 @@ export default function ManagerDashboardPage() {
                 <span className="text-xs text-slate-400">Quadra Fácil Style</span>
               </div>
               <h1 className="text-3xl font-black tracking-tight text-white mt-1">
-                {timelineData?.timeline?.[0]?.venue_name || "Beach Arena Itaim"}
+                <span className="text-sports-gradient">{timelineData?.timeline?.[0]?.venue_name || "Beach Arena Itaim"}</span>
               </h1>
               <p className="text-xs text-slate-400">
                 Grade operacional diária e gestão integrada de fluxo e canais de contato.

@@ -30,11 +30,11 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-black text-sm">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-600 via-teal-600 to-[#ff7043] flex items-center justify-center text-white font-black text-sm shadow-sm">
                 AG
               </div>
-              <span className="font-bold text-xl text-white">
-                Arena<span className="text-emerald-400">Go</span>
+              <span className="font-black text-xl text-white">
+                Arena<span className="text-sports-gradient">Go</span>
               </span>
             </div>
             <p className="text-sm text-slate-400 max-w-sm mb-4">
