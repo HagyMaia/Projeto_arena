@@ -231,27 +231,50 @@ function PlayerPortalContent() {
                   const timeFormatted = `${String(startDate.getHours()).padStart(2, "0")}:00 às ${String(endDate.getHours()).padStart(2, "0")}:00`;
 
                   const isCancelled = booking.status === "CANCELLED";
+                  const isPaid = booking.payment_status === "PAID" || booking.status === "CONFIRMED";
+                  const isPendingPayment = (booking.status === "PENDING" || booking.payment_status === "PENDING") && !isCancelled;
+                  const isExpired = booking.status === "EXPIRED" || booking.payment_status === "EXPIRED";
+                  const isRefunded = booking.payment_status === "REFUNDED";
 
                   return (
                     <div
                       key={booking.id}
                       className={`bg-white dark:bg-[#0F172A] rounded-2xl border p-5 transition-all shadow-xs ${
-                        isCancelled ? "border-slate-200 dark:border-slate-800 opacity-60" : "border-slate-200 dark:border-slate-800 hover:border-emerald-500 dark:hover:border-emerald-500 hover:shadow-md"
+                        isCancelled || isExpired ? "border-slate-200 dark:border-slate-800 opacity-60" : "border-slate-200 dark:border-slate-800 hover:border-emerald-500 dark:hover:border-emerald-500 hover:shadow-md"
                       }`}
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
-                              isCancelled 
-                                ? "bg-rose-100 dark:bg-rose-950/70 text-rose-700 dark:text-rose-300" 
-                                : "bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300"
-                            }`}>
-                              {isCancelled ? "Cancelado" : "Confirmado"}
-                            </span>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {isPaid && (
+                              <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300">
+                                Confirmado • Pago
+                              </span>
+                            )}
+                            {isPendingPayment && (
+                              <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-amber-600" />
+                                Aguardando Pagamento
+                              </span>
+                            )}
+                            {isExpired && (
+                              <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                                Tempo Expirado
+                              </span>
+                            )}
+                            {isRefunded && (
+                              <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/70 text-purple-800 dark:text-purple-300">
+                                Estornado
+                              </span>
+                            )}
+                            {isCancelled && !isExpired && (
+                              <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/70 text-rose-700 dark:text-rose-300">
+                                Cancelado
+                              </span>
+                            )}
 
-                            <span className="text-[10px] font-bold text-slate-400">
-                              Reserva #{booking.id.substring(0, 8).toUpperCase()}
+                            <span className="text-[10px] font-bold text-slate-400 font-mono">
+                              #{booking.id.substring(0, 8).toUpperCase()}
                             </span>
                           </div>
 
@@ -264,13 +287,21 @@ function PlayerPortalContent() {
                           </p>
 
                           <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
-                            Pagamento: {booking.payment_status === "PAID" ? "Pago via PIX/Cartão" : "Pendente"} • R$ {Number(booking.total_amount).toFixed(2).replace(".", ",")}
+                            {isPaid ? "Pago via Mercado Pago" : isPendingPayment ? "Cobrança Pix/Cartão gerada" : "Valor"}: R$ {Number(booking.total_amount).toFixed(2).replace(".", ",")}
                           </p>
                         </div>
 
                         {/* Ações */}
                         <div className="flex items-center gap-2">
-                          {!isCancelled && (
+                          {isPendingPayment && (
+                            <Link
+                              href="/checkout"
+                              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-xs"
+                            >
+                              Concluir Pix
+                            </Link>
+                          )}
+                          {!isCancelled && !isExpired && (
                             <button
                               type="button"
                               disabled={cancellingId === booking.id}

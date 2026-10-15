@@ -37,6 +37,7 @@ class Venue(Base):
     courts = relationship("Court", back_populates="venue", cascade="all, delete-orphan")
     operating_hours = relationship("OperatingHour", back_populates="venue", cascade="all, delete-orphan")
     whatsapp_contacts = relationship("WhatsAppContact", back_populates="venue", cascade="all, delete-orphan")
+    payment_account = relationship("VenuePaymentAccount", back_populates="venue", uselist=False, cascade="all, delete-orphan")
 
 
 class WhatsAppContact(Base):

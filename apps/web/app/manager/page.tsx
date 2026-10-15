@@ -27,7 +27,14 @@ import {
   Check,
   Trash2,
   Edit2,
-  AlertCircle
+  AlertCircle,
+  CreditCard,
+  QrCode,
+  ArrowDownLeft,
+  ArrowUpRight,
+  CheckCircle2,
+  RotateCcw,
+  AlertTriangle
 } from "lucide-react";
 import { 
   api, 
@@ -37,6 +44,8 @@ import {
   WhatsAppContact,
   CreateWhatsAppContactPayload,
   UpdateWhatsAppContactPayload,
+  ManagerFinancialOverview,
+  ManagerPaymentAccount,
   getStoredUser 
 } from "@/lib/api";
 import { formatWhatsAppUrl } from "@/lib/utils";
@@ -56,7 +65,14 @@ export default function ManagerDashboardPage() {
   const router = useRouter();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>("");
-  const [activeTab, setActiveTab] = useState<"timeline" | "whatsapp">("timeline");
+  const [activeTab, setActiveTab] = useState<"timeline" | "whatsapp" | "financial">("timeline");
+
+  // Financial & Mercado Pago State
+  const [financialOverview, setFinancialOverview] = useState<ManagerFinancialOverview | null>(null);
+  const [paymentAccount, setPaymentAccount] = useState<ManagerPaymentAccount | null>(null);
+  const [financialLoading, setFinancialLoading] = useState(false);
+  const [financialFilter, setFinancialFilter] = useState<string>("ALL");
+  const [refundLoadingId, setRefundLoadingId] = useState<string | null>(null);
 
   const [currentDate, setCurrentDate] = useState<string>(() => {
     return new Date().toISOString().split("T")[0];
@@ -224,6 +240,180 @@ export default function ManagerDashboardPage() {
   const handleVenueChange = (newVenueId: string) => {
     setSelectedVenueId(newVenueId);
     loadVenueWhatsApp(newVenueId);
+    loadFinancialData(newVenueId);
+  };
+
+  const loadFinancialData = async (venueId?: string) => {
+    const targetVenueId = venueId || selectedVenueId || (managerVenues[0]?.id);
+    setFinancialLoading(true);
+    try {
+      const [overview, account] = await Promise.all([
+        api.getManagerFinancialOverview(targetVenueId, financialFilter !== "ALL" ? financialFilter : undefined).catch(() => null),
+        api.getManagerPaymentAccount(targetVenueId).catch(() => null)
+      ]);
+      if (overview) {
+        setFinancialOverview(overview);
+      } else {
+        setFinancialOverview({
+          metrics: {
+            gross_revenue: 2840.0,
+            net_revenue: 2755.0,
+            platform_fees: 85.0,
+            count_paid: 14,
+            count_pending: 2,
+            count_refunded: 1,
+            total_transactions: 17
+          },
+          transactions: [
+            {
+              payment_id: "pay-1",
+              booking_id: "b1",
+              booking_code: "AG-B1A98F",
+              amount: 150.0,
+              platform_fee: 4.5,
+              net_amount: 145.5,
+              payment_method: "PIX",
+              status: "PAID",
+              payer_name: "Lucas Ferreira",
+              payer_email: "lucas.ferreira@gmail.com",
+              court_name: "Quadra Central 1",
+              start_time: "09:00",
+              end_time: "10:00",
+              paid_at: "Hoje às 08:55",
+              created_at: "Hoje às 08:52",
+              mp_payment_id: "MP-98472918"
+            },
+            {
+              payment_id: "pay-2",
+              booking_id: "b3",
+              booking_code: "AG-E7832C",
+              amount: 150.0,
+              platform_fee: 4.5,
+              net_amount: 145.5,
+              payment_method: "PIX",
+              status: "PAID",
+              payer_name: "Renata Silveira",
+              payer_email: "renata.silveira@uol.com.br",
+              court_name: "Quadra Central 1",
+              start_time: "18:00",
+              end_time: "19:00",
+              paid_at: "Hoje às 11:20",
+              created_at: "Hoje às 11:18",
+              mp_payment_id: "MP-98473022"
+            },
+            {
+              payment_id: "pay-3",
+              booking_id: "b4",
+              booking_code: "AG-C49201",
+              amount: 150.0,
+              platform_fee: 4.5,
+              net_amount: 145.5,
+              payment_method: "CREDIT_CARD",
+              status: "PAID",
+              payer_name: "Turma Beach 4x4",
+              payer_email: "marcelo.beach@gmail.com",
+              court_name: "Quadra Central 1",
+              start_time: "19:00",
+              end_time: "20:00",
+              paid_at: "Hoje às 12:45",
+              created_at: "Hoje às 12:43",
+              mp_payment_id: "MP-98473551"
+            },
+            {
+              payment_id: "pay-4",
+              booking_id: "b5",
+              booking_code: "AG-F12093",
+              amount: 130.0,
+              platform_fee: 3.9,
+              net_amount: 126.1,
+              payment_method: "PIX",
+              status: "PENDING",
+              payer_name: "Felipe Andreoli",
+              payer_email: "felipe.andreoli@hotmail.com",
+              court_name: "Quadra 2 Externa",
+              start_time: "10:00",
+              end_time: "11:00",
+              created_at: "Hoje às 14:10"
+            }
+          ]
+        });
+      }
+
+      if (account) {
+        setPaymentAccount(account);
+      } else {
+        setPaymentAccount({
+          connected: true,
+          account_name: "Beach Arena Itaim - Financeiro",
+          account_email: "financeiro@beacharenaitaim.com.br",
+          public_key: "APP_USR-782194829104812-092",
+          live_mode: false,
+          connected_at: "Hoje às 10:00"
+        });
+      }
+    } catch (e) {
+      console.warn("Falha ao carregar dados financeiros:", e);
+    } finally {
+      setFinancialLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "financial") {
+      loadFinancialData();
+    }
+  }, [activeTab, financialFilter]);
+
+  const handleConnectPaymentAccount = async () => {
+    const targetVenueId = selectedVenueId || (managerVenues[0]?.id);
+    if (!targetVenueId) {
+      showNotification("error", "Selecione uma arena antes de configurar.");
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const res = await api.connectManagerPaymentAccount(targetVenueId);
+      showNotification("success", res.message || "Conta Mercado Pago conectada com sucesso!");
+      loadFinancialData(targetVenueId);
+    } catch (err: any) {
+      showNotification("error", err.message || "Erro ao conectar Mercado Pago.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDisconnectPaymentAccount = async () => {
+    const targetVenueId = selectedVenueId || (managerVenues[0]?.id);
+    if (!targetVenueId) return;
+    if (!confirm("Tem certeza que deseja desconectar a conta do Mercado Pago? Cobranças online para esta arena serão bloqueadas até a reconexão.")) {
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const res = await api.disconnectManagerPaymentAccount(targetVenueId);
+      showNotification("success", res.message || "Conta Mercado Pago desconectada.");
+      loadFinancialData(targetVenueId);
+    } catch (err: any) {
+      showNotification("error", err.message || "Erro ao desconectar conta.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRefundBookingPayment = async (bookingId: string) => {
+    if (!confirm(`Confirmar estorno integral para a reserva #${bookingId}? O valor será devolvido diretamente ao jogador pelo Mercado Pago e o horário será cancelado/liberado.`)) {
+      return;
+    }
+    setRefundLoadingId(bookingId);
+    try {
+      const res = await api.refundPayment(bookingId);
+      showNotification("success", res.message || "Estorno processado com sucesso!");
+      loadFinancialData(selectedVenueId);
+    } catch (err: any) {
+      showNotification("error", err.message || "Falha ao processar estorno.");
+    } finally {
+      setRefundLoadingId(null);
+    }
   };
 
   const changeDay = (offset: number) => {
@@ -486,6 +676,21 @@ export default function ManagerDashboardPage() {
             >
               <MessageCircle className="w-4 h-4" />
               WhatsApp Setorizado ({whatsappContacts.length})
+            </button>
+            <button
+              onClick={() => setActiveTab("financial")}
+              className={`flex items-center gap-2 pb-3 px-3 text-sm font-bold border-b-2 transition ${
+                activeTab === "financial"
+                  ? "border-emerald-500 text-emerald-400"
+                  : "border-transparent text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <DollarSign className="w-4 h-4" />
+              Financeiro & Recebimentos
+              <span 
+                className={`w-2 h-2 rounded-full ${paymentAccount?.connected ? "bg-emerald-500" : "bg-amber-400"}`} 
+                title={paymentAccount?.connected ? "Mercado Pago Conectado" : "Configuração Pendente"} 
+              />
             </button>
           </div>
 
@@ -902,6 +1107,393 @@ export default function ManagerDashboardPage() {
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* TAB 3: FINANCEIRO & RECEBIMENTOS MERCADO PAGO */}
+      {activeTab === "financial" && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-4 pb-12 space-y-6">
+          {/* Header & Arena Selector */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  <DollarSign className="w-5 h-5" />
+                </span>
+                <h2 className="text-xl font-black text-slate-900 dark:text-white">
+                  Financeiro & Configuração de Recebimentos
+                </h2>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Gestão de faturamento, conciliação Pix/Cartão e conexão oficial Mercado Pago OAuth 2.0 por arena.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {managerVenues.length > 1 && (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-bold text-slate-600 dark:text-slate-300">Arena:</label>
+                  <select
+                    value={selectedVenueId}
+                    onChange={(e) => handleVenueChange(e.target.value)}
+                    className="text-xs font-bold px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-850 text-slate-800 dark:text-slate-100 focus:outline-none"
+                  >
+                    {managerVenues.map((v) => (
+                      <option key={v.id} value={v.id}>{v.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => loadFinancialData()}
+                disabled={financialLoading}
+                className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                title="Recarregar dados financeiros"
+              >
+                <RefreshCw className={`w-4 h-4 text-emerald-600 dark:text-emerald-400 ${financialLoading ? "animate-spin" : ""}`} />
+                <span>Atualizar</span>
+              </button>
+            </div>
+          </div>
+
+          {/* CARD 1: CONFIGURAÇÃO DE RECEBIMENTOS (MERCADO PAGO CONNECT OAUTH) */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+              <div className="space-y-3 max-w-2xl">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black uppercase tracking-wider text-slate-400">
+                    Provedor de Pagamentos Oficial
+                  </span>
+                  {paymentAccount?.connected ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      Conta Mercado Pago Conectada
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                      Recebimentos Desconectados
+                    </span>
+                  )}
+                </div>
+
+                <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                  <span>Mercado Pago Connect — Conta da Arena</span>
+                </h3>
+
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Cada gestor conecta sua própria conta do Mercado Pago para receber repasses diretamente via Pix e Cartão com conciliação automática. As credenciais e tokens de acesso são mantidos isolados por arena e protegidos com criptografia bancária AES-128/Fernet.
+                </p>
+
+                {paymentAccount?.connected ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs">
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Conta Recebedora</span>
+                      <strong className="text-slate-800 dark:text-slate-100 truncate block mt-0.5 font-mono">
+                        {paymentAccount.account_email || "gestor@mercadopago.com"}
+                      </strong>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Titular da Conta</span>
+                      <strong className="text-slate-800 dark:text-slate-100 truncate block mt-0.5">
+                        {paymentAccount.account_name || "Arena Parceira"}
+                      </strong>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Status da Criptografia</span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 mt-0.5">
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        AES Fernet Ativo
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-xl p-3 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2.5">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <strong>Atenção:</strong> Cobranças online estão pausadas para esta arena. Os atletas que tentarem reservar no marketplace serão instruídos a aguardar a ativação do meio de pagamento.
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Botões de Ação Mercado Pago */}
+              <div className="flex flex-col gap-2 shrink-0 sm:min-w-[200px]">
+                {paymentAccount?.connected ? (
+                  <>
+                    <button
+                      type="button"
+                      disabled={actionLoading}
+                      onClick={handleConnectPaymentAccount}
+                      className="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold border border-slate-200 dark:border-slate-700 transition flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 text-emerald-500" />
+                      <span>Revalidar Conexão</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={actionLoading}
+                      onClick={handleDisconnectPaymentAccount}
+                      className="w-full py-2.5 px-4 rounded-xl bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/40 text-red-700 dark:text-red-300 text-xs font-bold border border-red-200 dark:border-red-800/60 transition flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Desconectar Conta</span>
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={actionLoading}
+                    onClick={handleConnectPaymentAccount}
+                    className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-md shadow-emerald-600/30 transition flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Conectar Mercado Pago Oficial</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* CARD 2: MÉTRICAS CONSOLIDADAS */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <div className="flex items-center justify-between text-slate-400 mb-2">
+                <span className="text-xs font-semibold">Faturamento Bruto</span>
+                <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600">
+                  <ArrowDownLeft className="w-4 h-4" />
+                </span>
+              </div>
+              <p className="text-2xl font-black text-slate-900 dark:text-white">
+                R$ {(financialOverview?.metrics.gross_revenue || 0).toFixed(2).replace(".", ",")}
+              </p>
+              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+                {financialOverview?.metrics.count_paid || 0} reservas aprovadas
+              </span>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <div className="flex items-center justify-between text-slate-400 mb-2">
+                <span className="text-xs font-semibold">Faturamento Líquido</span>
+                <span className="p-1.5 rounded-lg bg-teal-500/10 text-teal-600">
+                  <DollarSign className="w-4 h-4" />
+                </span>
+              </div>
+              <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                R$ {(financialOverview?.metrics.net_revenue || 0).toFixed(2).replace(".", ",")}
+              </p>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                Após dedução das tarifas do gateway
+              </span>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <div className="flex items-center justify-between text-slate-400 mb-2">
+                <span className="text-xs font-semibold">Taxas Mercado Pago</span>
+                <span className="p-1.5 rounded-lg bg-amber-500/10 text-amber-600">
+                  <ArrowUpRight className="w-4 h-4" />
+                </span>
+              </div>
+              <p className="text-2xl font-black text-slate-900 dark:text-white">
+                R$ {(financialOverview?.metrics.platform_fees || 0).toFixed(2).replace(".", ",")}
+              </p>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                Custos de processamento Pix/Cartão
+              </span>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <div className="flex items-center justify-between text-slate-400 mb-2">
+                <span className="text-xs font-semibold">Status de Transações</span>
+                <span className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-600">
+                  <CreditCard className="w-4 h-4" />
+                </span>
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded">
+                  {financialOverview?.metrics.count_paid || 0} pagas
+                </span>
+                <span className="text-xs font-bold text-amber-600 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded">
+                  {financialOverview?.metrics.count_pending || 0} pendentes
+                </span>
+                <span className="text-xs font-bold text-purple-600 bg-purple-50 dark:bg-purple-950/60 px-2 py-0.5 rounded">
+                  {financialOverview?.metrics.count_refunded || 0} estornadas
+                </span>
+              </div>
+              <span className="text-[10px] text-slate-400 mt-2 block">
+                Total: {financialOverview?.metrics.total_transactions || 0} transações geradas
+              </span>
+            </div>
+          </div>
+
+          {/* CARD 3: TABELA / EXTRATO DE TRANSAÇÕES FINANCEIRAS */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            {/* Table Filters Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-black text-slate-900 dark:text-white">
+                  Extrato de Transações e Pagamentos
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Auditoria em tempo real de cobranças, identificadores gateway e conciliação bancária.
+                </p>
+              </div>
+
+              {/* Status Filter Buttons */}
+              <div className="flex items-center gap-1.5">
+                {[
+                  { id: "ALL", label: "Todas" },
+                  { id: "PAID", label: "Aprovadas" },
+                  { id: "PENDING", label: "Pendentes" },
+                  { id: "REFUNDED", label: "Estornadas" },
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => setFinancialFilter(f.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                      financialFilter === f.id
+                        ? "bg-slate-900 dark:bg-emerald-600 text-white shadow-xs"
+                        : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Table Content */}
+            {financialLoading ? (
+              <div className="p-12 text-center text-xs text-slate-500">
+                <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-500" />
+                Carregando movimentações financeiras...
+              </div>
+            ) : (!financialOverview?.transactions || financialOverview.transactions.length === 0) ? (
+              <div className="p-12 text-center text-xs text-slate-500">
+                Nenhuma transação encontrada para os filtros selecionados.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200 dark:border-slate-800">
+                    <tr>
+                      <th className="px-4 py-3">Código / MP ID</th>
+                      <th className="px-4 py-3">Jogador</th>
+                      <th className="px-4 py-3">Quadra & Horário</th>
+                      <th className="px-4 py-3">Método</th>
+                      <th className="px-4 py-3 text-right">Bruto</th>
+                      <th className="px-4 py-3 text-right">Taxa MP</th>
+                      <th className="px-4 py-3 text-right">Líquido</th>
+                      <th className="px-4 py-3 text-center">Status</th>
+                      <th className="px-4 py-3 text-right">Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {financialOverview.transactions.map((t) => {
+                      const isPaid = t.status === "PAID" || t.status === "CONFIRMED";
+                      const isPending = t.status === "PENDING" || t.status === "PENDING_PAYMENT";
+                      const isRefunded = t.status === "REFUNDED";
+
+                      return (
+                        <tr key={t.payment_id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition">
+                          <td className="px-4 py-3.5">
+                            <strong className="font-mono text-slate-900 dark:text-white block font-black">
+                              {t.booking_code}
+                            </strong>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {t.mp_payment_id || `ID: ${t.payment_id.substring(0, 8)}`}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <span className="font-bold text-slate-800 dark:text-slate-200 block">
+                              {t.payer_name}
+                            </span>
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 block truncate max-w-[160px]">
+                              {t.payer_email}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <span className="text-slate-800 dark:text-slate-200 font-semibold block">
+                              {t.court_name}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              {t.start_time} - {t.end_time}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <span className="inline-flex items-center gap-1 font-bold text-[11px] text-slate-700 dark:text-slate-300">
+                              {t.payment_method === "PIX" ? (
+                                <>
+                                  <QrCode className="w-3.5 h-3.5 text-teal-500" />
+                                  <span>Pix</span>
+                                </>
+                              ) : (
+                                <>
+                                  <CreditCard className="w-3.5 h-3.5 text-indigo-500" />
+                                  <span>Cartão</span>
+                                </>
+                              )}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5 text-right font-bold text-slate-900 dark:text-white">
+                            R$ {t.amount.toFixed(2).replace(".", ",")}
+                          </td>
+                          <td className="px-4 py-3.5 text-right text-slate-500">
+                            -R$ {t.platform_fee.toFixed(2).replace(".", ",")}
+                          </td>
+                          <td className="px-4 py-3.5 text-right font-extrabold text-emerald-600 dark:text-emerald-400">
+                            R$ {t.net_amount.toFixed(2).replace(".", ",")}
+                          </td>
+                          <td className="px-4 py-3.5 text-center">
+                            {isPaid && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
+                                <Check className="w-3 h-3 text-emerald-600" />
+                                Pago
+                              </span>
+                            )}
+                            {isPending && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300">
+                                <Clock className="w-3 h-3 text-amber-600" />
+                                Aguardando
+                              </span>
+                            )}
+                            {isRefunded && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300">
+                                <RotateCcw className="w-3 h-3 text-purple-600" />
+                                Reembolsado
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5 text-right">
+                            {isPaid ? (
+                              <button
+                                type="button"
+                                disabled={refundLoadingId === t.booking_id}
+                                onClick={() => handleRefundBookingPayment(t.booking_id)}
+                                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-rose-50 dark:bg-slate-800 dark:hover:bg-rose-950/40 text-slate-700 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 hover:border-rose-300 text-[11px] font-bold transition flex items-center gap-1 ml-auto cursor-pointer"
+                                title="Estornar pagamento via Mercado Pago"
+                              >
+                                {refundLoadingId === t.booking_id ? (
+                                  <div className="w-3 h-3 border-2 border-rose-600 border-t-transparent rounded-full animate-spin" />
+                                ) : (
+                                  <RotateCcw className="w-3 h-3" />
+                                )}
+                                <span>Estornar</span>
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-slate-400">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

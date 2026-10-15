@@ -60,8 +60,8 @@ export interface Booking {
   user_id: string;
   start_time: string;
   end_time: string;
-  status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
-  payment_status: "UNPAID" | "PAID" | "REFUNDED" | "PENDING";
+  status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED" | "EXPIRED";
+  payment_status: "UNPAID" | "PAID" | "REFUNDED" | "PENDING" | "EXPIRED";
   booking_type: "ONLINE_SINGLE" | "RECURRING_MONTHLY" | "OFFLINE_MANUAL";
   total_amount: number;
   court_name?: string;
@@ -632,5 +632,135 @@ export const api = {
       method: "DELETE",
     });
   },
+
+  // Mercado Pago & Sistema de Pagamentos
+  async createPaymentIntent(payload: {
+    court_id: string;
+    start_time: string;
+    end_time: string;
+    booking_type?: string;
+    payment_method: "PIX" | "CREDIT_CARD";
+    notes?: string;
+    card_token?: string;
+    card_brand?: string;
+    card_last_four?: string;
+  }): Promise<PaymentIntentResponse> {
+    return request<PaymentIntentResponse>("/payments/create-intent", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getPaymentStatus(bookingId: string): Promise<PaymentStatusResponse> {
+    return request<PaymentStatusResponse>(`/payments/status/${bookingId}`);
+  },
+
+  async refundPayment(bookingId: string): Promise<{ success: boolean; message: string; refunded_amount: number }> {
+    return request<{ success: boolean; message: string; refunded_amount: number }>(`/payments/${bookingId}/refund`, {
+      method: "POST",
+    });
+  },
+
+  async getManagerPaymentAccount(venueId?: string): Promise<ManagerPaymentAccount> {
+    const qs = venueId ? `?venue_id=${venueId}` : "";
+    return request<ManagerPaymentAccount>(`/payments/manager/account${qs}`);
+  },
+
+  async connectManagerPaymentAccount(venueId: string, code?: string): Promise<{ success: boolean; message: string; account_email?: string }> {
+    return request<{ success: boolean; message: string; account_email?: string }>("/payments/manager/connect", {
+      method: "POST",
+      body: JSON.stringify({ venue_id: venueId, code, test_mode: true }),
+    });
+  },
+
+  async disconnectManagerPaymentAccount(venueId: string): Promise<{ success: boolean; message: string }> {
+    return request<{ success: boolean; message: string }>(`/payments/manager/disconnect?venue_id=${venueId}`, {
+      method: "DELETE",
+    });
+  },
+
+  async getManagerFinancialOverview(venueId?: string, statusFilter?: string): Promise<ManagerFinancialOverview> {
+    const params = new URLSearchParams();
+    if (venueId) params.append("venue_id", venueId);
+    if (statusFilter) params.append("status_filter", statusFilter);
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    return request<ManagerFinancialOverview>(`/payments/manager/financial-overview${qs}`);
+  },
+
+  async getAdminFinancialOverview(): Promise<{ gmv_volume: number; platform_fee_revenue: number; total_paid_orders: number; connected_venues_count: number; payment_gateway: string }> {
+    return request<{ gmv_volume: number; platform_fee_revenue: number; total_paid_orders: number; connected_venues_count: number; payment_gateway: string }>("/payments/admin/overview");
+  },
 };
+
+export interface PaymentIntentResponse {
+  booking_id: string;
+  payment_id: string;
+  amount: number;
+  status: string;
+  payment_method: string;
+  pix_qr_code?: string;
+  pix_code?: string;
+  expires_at?: string;
+  venue_name: string;
+  court_name: string;
+  date_formatted: string;
+  time_range: string;
+}
+
+export interface PaymentStatusResponse {
+  booking_id: string;
+  booking_status: string;
+  payment_status: string;
+  is_confirmed: boolean;
+  amount: number;
+  payment_method?: string;
+  pix_code?: string;
+  pix_qr_code?: string;
+  expires_at?: string;
+  paid_at?: string;
+  voucher_code?: string;
+}
+
+export interface ManagerFinancialOverview {
+  metrics: {
+    gross_revenue: number;
+    net_revenue: number;
+    platform_fees: number;
+    count_paid: number;
+    count_pending: number;
+    count_refunded: number;
+    total_transactions: number;
+  };
+  transactions: {
+    payment_id: string;
+    booking_id: string;
+    booking_code: string;
+    amount: number;
+    platform_fee: number;
+    net_amount: number;
+    payment_method: string;
+    status: string;
+    payer_name: string;
+    payer_email: string;
+    court_name: string;
+    start_time: string;
+    end_time: string;
+    paid_at?: string;
+    created_at: string;
+    mp_payment_id?: string;
+  }[];
+}
+
+export interface ManagerPaymentAccount {
+  venue_id?: string;
+  venue_name?: string;
+  connected: boolean;
+  status?: string;
+  account_email?: string;
+  account_name?: string;
+  public_key?: string;
+  live_mode?: boolean;
+  connected_at?: string;
+  auth_url?: string;
+}
 

@@ -48,6 +48,19 @@ class Settings(BaseSettings):
     EMAILS_FROM_NAME: str = os.getenv("EMAILS_FROM_NAME", "ArenaGo")
     EMAILS_FROM_EMAIL: str = os.getenv("EMAILS_FROM_EMAIL", "no-reply@arenago.com.br")
 
+    # Mercado Pago & Gateway Payments
+    MERCADOPAGO_ACCESS_TOKEN: str = os.getenv("MERCADOPAGO_ACCESS_TOKEN", "")
+    MERCADOPAGO_PUBLIC_KEY: str = os.getenv("MERCADOPAGO_PUBLIC_KEY", "")
+    MERCADOPAGO_CLIENT_ID: str = os.getenv("MERCADOPAGO_CLIENT_ID", "")
+    MERCADOPAGO_CLIENT_SECRET: str = os.getenv("MERCADOPAGO_CLIENT_SECRET", "")
+    MERCADOPAGO_REDIRECT_URI: str = os.getenv(
+        "MERCADOPAGO_REDIRECT_URI",
+        "https://projetoarena.vercel.app/manager?tab=financeiro"
+    )
+    MERCADOPAGO_WEBHOOK_SECRET: str = os.getenv("MERCADOPAGO_WEBHOOK_SECRET", "")
+    MERCADOPAGO_SANDBOX: bool = os.getenv("MERCADOPAGO_SANDBOX", "true").lower() in ("true", "1", "yes")
+    ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY", "")
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
