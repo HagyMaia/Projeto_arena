@@ -21,6 +21,7 @@ import {
   Phone
 } from "lucide-react";
 import { api, Venue, getStoredUser } from "@/lib/api";
+import { getOfficialSupportWhatsAppUrl } from "@/lib/utils";
 import { FloatingWhatsApp } from "@/components/FloatingWhatsApp";
 
 export default function MarketplacePage() {
@@ -317,13 +318,13 @@ export default function MarketplacePage() {
             </div>
 
             <a
-              href="https://wa.me/5511999998888?text=Ol%C3%A1%21+Gostaria+de+informa%C3%A7%C3%B5es+sobre+o+ArenaGo."
+              href={getOfficialSupportWhatsAppUrl()}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-xs font-bold text-white transition shadow-sm shrink-0"
             >
               <Phone className="w-3.5 h-3.5" />
-              Falar com Suporte
+              Central de Atendimento
             </a>
           </div>
 

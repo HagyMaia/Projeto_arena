@@ -36,6 +36,14 @@ function LoginContent() {
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotSuccess, setForgotSuccess] = useState("");
 
+  const portalParam = searchParams.get("portal");
+  const [activePortal, setActivePortal] = useState<"client" | "admin">(() => {
+    if (portalParam === "admin" || redirectUrl.startsWith("/manager") || redirectUrl.startsWith("/admin")) {
+      return "admin";
+    }
+    return "client";
+  });
+
   const handleContinueWithEmail = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
@@ -268,9 +276,45 @@ function LoginContent() {
           <h2 className="text-3xl font-black text-[#059669] tracking-tight">
             Arena<span className="text-slate-900 dark:text-white">Go</span>
           </h2>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium mb-6">
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium mb-4">
             Conectamos você com o esporte!
           </p>
+
+          {/* Seletor de Ambiente: Atleta/Cliente vs Gestão/Admin */}
+          <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl mb-4 w-full max-w-xs border border-slate-200 dark:border-slate-700">
+            <button
+              type="button"
+              onClick={() => { setActivePortal("client"); setErrorMsg(""); }}
+              className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                activePortal === "client"
+                  ? "bg-emerald-600 text-white shadow-xs"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <span>⚽ Atleta / Cliente</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setActivePortal("admin"); setErrorMsg(""); }}
+              className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                activePortal === "admin"
+                  ? "bg-[#0F172A] text-white shadow-xs"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <span>🏢 Gestão & Admin</span>
+            </button>
+          </div>
+
+          <div className="mb-4 text-center">
+            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block ${
+              activePortal === "client"
+                ? "bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-850"
+                : "bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700"
+            }`}>
+              {activePortal === "client" ? "Portal do Jogador" : "Ambiente de Gestão & Administração"}
+            </span>
+          </div>
 
           {/* Feedback Messages */}
           {errorMsg && (
@@ -439,30 +483,38 @@ function LoginContent() {
           {/* Demo Accounts Quick Selection for Easy Testing */}
           <div className="w-full max-w-xs mt-6 pt-5 border-t border-slate-100 dark:border-slate-800 text-left">
             <span className="text-[10px] uppercase font-black tracking-wider text-slate-400 block mb-2">
-              Acesso Rápido de Testes (1-Clique):
+              {activePortal === "client" ? "Acesso Rápido para Atleta (1-Clique):" : "Acesso de Testes Administrativos (1-Clique):"}
             </span>
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                onClick={() => handleDemoSelect("jogador@arenago.com.br", "player123")}
-                className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-[11px] font-bold border border-emerald-200 dark:border-emerald-800 transition"
-              >
-                ⚽ Lucas (Jogador)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoSelect("gestor@beacharena.com.br", "arena123")}
-                className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 text-[11px] font-bold border border-slate-300 transition"
-              >
-                🏢 Carlos (Gestor)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoSelect("admin@arenago.com.br", "admin123")}
-                className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 text-[11px] font-bold border border-slate-200 transition"
-              >
-                👑 Super Admin
-              </button>
+            <div className="flex flex-col gap-2">
+              {activePortal === "client" ? (
+                <button
+                  type="button"
+                  onClick={() => handleDemoSelect("jogador@arenago.com.br", "player123")}
+                  className="w-full py-2 px-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-xs font-bold border border-emerald-200 dark:border-emerald-800 transition flex items-center justify-between"
+                >
+                  <span>⚽ Lucas Ferreira (Atleta / Cliente)</span>
+                  <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">Entrar</span>
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleDemoSelect("gestor@beacharena.com.br", "arena123")}
+                    className="w-full py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold border border-slate-200 dark:border-slate-700 transition flex items-center justify-between"
+                  >
+                    <span>🏢 Carlos (Gestor de Arena)</span>
+                    <span className="text-[10px] font-semibold text-slate-500">Painel Gestor</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDemoSelect("admin@arenago.com.br", "admin123")}
+                    className="w-full py-2 px-3 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-900 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/60 text-xs font-bold border border-purple-200 dark:border-purple-800 transition flex items-center justify-between"
+                  >
+                    <span>👑 Super Admin (SaaS Global)</span>
+                    <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400">Admin Geral</span>
+                  </button>
+                </>
+              )}
             </div>
           </div>
 

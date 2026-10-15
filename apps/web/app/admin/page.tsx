@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { 
   TrendingUp, 
@@ -49,6 +50,7 @@ import {
   UpdateWhatsAppContactPayload,
   getStoredUser
 } from "@/lib/api";
+import { formatWhatsAppUrl } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 // High quality sports facility images for easy 1-click preview
@@ -727,7 +729,25 @@ export default function SuperAdminPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/"
+              className="px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+              title="Acessar o portal público dos clientes/atletas"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Visão Cliente</span>
+            </Link>
+
+            <Link
+              href="/manager"
+              className="px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+              title="Acessar o painel operacional de arenas"
+            >
+              <Building className="w-3.5 h-3.5 text-blue-400" />
+              <span>Painel Gestor</span>
+            </Link>
+
             <ThemeToggle />
 
             <button
@@ -1354,9 +1374,7 @@ export default function SuperAdminPage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {whatsappContacts.map((c) => {
-                  const cleanPhone = c.phone_number.replace(/\D/g, "");
-                  const encodedMsg = encodeURIComponent(c.custom_message || "Olá! Gostaria de falar com o suporte ArenaGo.");
-                  const waUrl = `https://wa.me/55${cleanPhone}?text=${encodedMsg}`;
+                  const waUrl = formatWhatsAppUrl(c.phone_number, c.custom_message || "Olá! Gostaria de falar com o suporte ArenaGo.");
 
                   return (
                     <div

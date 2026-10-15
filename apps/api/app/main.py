@@ -3,10 +3,11 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+import app.models
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal, Base, engine
-from app.services.seed_service import seed_initial_data
+from app.services.seed_service import seed_initial_data, seed_platform_contacts
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("arenago")
@@ -28,9 +29,11 @@ async def lifespan(app: FastAPI):
             logger.warning(f"Aviso de migração de colunas: {e}")
     logger.info("Tabelas verificadas e criadas.")
 
-    # Popular dados de demonstração
+    # Popular dados de demonstração e contato oficial
     async with AsyncSessionLocal() as session:
         await seed_initial_data(session)
+        await seed_platform_contacts(session)
+
 
     yield
 

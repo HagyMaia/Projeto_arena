@@ -96,65 +96,25 @@ function PlayerPortalContent() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B1220] flex flex-col selection:bg-emerald-600 selection:text-white pb-24 transition-colors duration-200">
-      {/* Top Header Marinho e Esmeralda */}
-      <header className="bg-[#0F172A] text-white shadow-md border-b border-slate-800">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="w-10 h-8 rounded-lg bg-emerald-600/30 border border-emerald-500/50 flex flex-col items-center justify-center p-1 backdrop-blur-xs group-hover:scale-105 transition-transform">
-              <div className="flex gap-1 mb-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-              </div>
-              <div className="w-6 h-2.5 bg-emerald-500/40 rounded-xs flex items-center justify-around">
-                <span className="w-1 h-1 rounded-full bg-white"></span>
-                <span className="w-1 h-1 rounded-full bg-white"></span>
-              </div>
-            </div>
-            <span className="text-2xl font-black tracking-tight text-white font-sans lowercase">
-              arena<span className="text-emerald-400">go</span>
-            </span>
-          </Link>
-
-          <div className="flex items-center gap-3 sm:gap-4 text-sm">
-            <ThemeToggle />
-
-            <Link 
-              href="/" 
-              className="text-xs sm:text-sm font-semibold text-slate-300 hover:text-white transition"
-            >
-              Centros Esportivos
-            </Link>
-
-            {currentUser ? (
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-full bg-emerald-600 text-white font-extrabold flex items-center justify-center text-sm shadow-sm ring-2 ring-emerald-500/30">
-                  {currentUser.name.charAt(0).toUpperCase()}
-                </div>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  title="Sair"
-                  className="text-slate-400 hover:text-white p-1 transition"
-                >
-                  <LogOut className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <Link
-                href="/login"
-                className="px-3.5 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition"
-              >
-                Entrar
-              </Link>
-            )}
-          </div>
-        </div>
-      </header>
-
       {/* Conteúdo Principal */}
       <main className="max-w-5xl w-full mx-auto px-4 py-8 flex-1">
         
+        {/* Banner exclusivo para Gestores/Admins navegando na visão de atleta */}
+        {(currentUser?.role === "MANAGER" || currentUser?.role === "SUPERADMIN") && (
+          <div className="mb-6 p-3.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 text-purple-900 dark:text-purple-300 text-xs font-semibold flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
+              <span>Você está conectado com perfil de <strong>{currentUser.role === "SUPERADMIN" ? "Super Admin" : "Gestor"}</strong> navegando na visão de cliente.</span>
+            </div>
+            <Link
+              href={currentUser.role === "SUPERADMIN" ? "/admin" : "/manager"}
+              className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition text-center shrink-0"
+            >
+              Voltar ao Painel Administrativo
+            </Link>
+          </div>
+        )}
+
         {/* Banner de Boas-vindas / Estatísticas */}
         <div className="bg-white dark:bg-[#0F172A] rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 p-6 mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors">
           <div className="flex items-center gap-4">

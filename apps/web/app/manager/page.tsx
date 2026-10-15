@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { 
   Calendar as CalendarIcon, 
@@ -38,6 +39,7 @@ import {
   UpdateWhatsAppContactPayload,
   getStoredUser 
 } from "@/lib/api";
+import { formatWhatsAppUrl } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 const SECTORS_LIST = [
@@ -392,8 +394,28 @@ export default function ManagerDashboardPage() {
               </p>
             </div>
 
-            {/* Top Right: Theme Toggle & Date Controls */}
+            {/* Top Right: Actions & Theme Toggle & Date Controls */}
             <div className="flex flex-wrap items-center gap-3">
+              <Link
+                href="/"
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                title="Visualizar a plataforma pública como atleta/cliente"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Ver Visão do Cliente</span>
+              </Link>
+
+              {userRole === "SUPERADMIN" && (
+                <Link
+                  href="/admin"
+                  className="px-3.5 py-2 rounded-xl bg-purple-900/40 hover:bg-purple-900/70 text-purple-200 border border-purple-700/60 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                  title="Acessar o Painel SuperAdmin SaaS"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+                  <span>SaaS Master</span>
+                </Link>
+              )}
+
               <ThemeToggle />
 
               {/* Date Navigation Bar (Only for Timeline tab) */}
@@ -781,9 +803,7 @@ export default function ManagerDashboardPage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {whatsappContacts.map((contact) => {
-                  const cleanPhone = contact.phone_number.replace(/\D/g, "");
-                  const encodedMsg = encodeURIComponent(contact.custom_message || "Olá! Gostaria de falar com o atendimento da arena.");
-                  const waUrl = `https://wa.me/55${cleanPhone}?text=${encodedMsg}`;
+                  const waUrl = formatWhatsAppUrl(contact.phone_number, contact.custom_message || "Olá! Gostaria de falar com o atendimento da arena.");
 
                   return (
                     <div

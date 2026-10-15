@@ -10,9 +10,10 @@ from app.models.organization import Organization, OrganizationMember
 from app.models.payment import Payment
 from app.models.subscription import Plan, Subscription
 from app.models.user import User
-from app.models.venue import Court, CourtImage, OperatingHour, Venue
+from app.models.venue import Court, CourtImage, OperatingHour, Venue, WhatsAppContact
 
 logger = logging.getLogger(__name__)
+
 
 
 async def seed_initial_data(db: AsyncSession):
@@ -136,6 +137,18 @@ async def seed_initial_data(db: AsyncSession):
     db.add_all([court_1, court_2, court_3])
     await db.flush()
 
+    contact_beach = WhatsAppContact(
+        venue_id=venue_beach.id,
+        department="Reservas & Recepção",
+        label="Atendimento Beach Arena",
+        phone_number="(11) 98888-0002",
+        custom_message="Olá! Gostaria de informações sobre horários na Beach Arena Itaim.",
+        is_primary=True,
+        is_active=True
+    )
+    db.add(contact_beach)
+    await db.flush()
+
     # Arena 2: Galaxy Sports Hub
     org_galaxy = Organization(
         name="Galaxy Sports Complex",
@@ -239,3 +252,49 @@ async def seed_initial_data(db: AsyncSession):
     db.add_all([b1, b2, b3])
     await db.commit()
     logger.info("Dados de demonstração do ArenaGo inseridos com sucesso!")
+
+    # Garantir contato oficial da plataforma
+    await seed_platform_contacts(db)
+
+
+async def seed_platform_contacts(db: AsyncSession):
+    """
+    Garante que o contato oficial da Central de Atendimento do ArenaGo (+55 92 98492-3316)
+    esteja cadastrado e ativo como canal geral da plataforma (venue_id=None).
+    """
+    try:
+        stmt = select(WhatsAppContact).where(WhatsAppContact.venue_id.is_(None))
+        result = await db.execute(stmt)
+        existing = result.scalars().first()
+
+        if not existing:
+            logger.info("Criando contato oficial da Central de Atendimento ArenaGo (+55 92 98492-3316)...")
+            platform_contact = WhatsAppContact(
+                venue_id=None,
+                department="Central de Atendimento",
+                label="Suporte Oficial ArenaGo",
+                phone_number="+55 92 98492-3316",
+                custom_message="Olá, preciso de ajuda com o ArenaGo.",
+                is_primary=True,
+                is_active=True
+            )
+            db.add(platform_contact)
+            await db.commit()
+            logger.info("Central de Atendimento oficial registrada com sucesso!")
+        elif "999998888" in existing.phone_number:
+            logger.info("Atualizando contato provisório da plataforma para o número oficial (+55 92 98492-3316)...")
+            existing.phone_number = "+55 92 98492-3316"
+            existing.department = "Central de Atendimento"
+            existing.label = "Suporte Oficial ArenaGo"
+            existing.custom_message = "Olá, preciso de ajuda com o ArenaGo."
+            existing.is_primary = True
+            existing.is_active = True
+            await db.commit()
+            logger.info("Central de Atendimento atualizada com sucesso para +55 92 98492-3316!")
+        else:
+            logger.info(f"Contato oficial da plataforma já existe: {existing.phone_number} ({existing.department})")
+
+    except Exception as e:
+        logger.warning(f"Erro ao sincronizar contato oficial de WhatsApp: {e}")
+        await db.rollback()
+

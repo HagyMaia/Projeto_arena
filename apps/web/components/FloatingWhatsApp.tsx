@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { MessageCircle, X, ExternalLink, ShieldCheck, Phone } from "lucide-react";
 import { api, WhatsAppContact } from "@/lib/api";
+import { formatWhatsAppUrl, getOfficialSupportWhatsAppUrl } from "@/lib/utils";
 
 interface FloatingWhatsAppProps {
   venueIdOrSlug?: string;
@@ -40,22 +41,13 @@ export function FloatingWhatsApp({ venueIdOrSlug, venueName }: FloatingWhatsAppP
     };
   }, [venueIdOrSlug]);
 
-  function formatPhoneForWhatsApp(phone: string): string {
-    const digits = phone.replace(/\D/g, "");
-    if (digits.length <= 11 && !digits.startsWith("55")) {
-      return `55${digits}`;
-    }
-    return digits;
+  function getWhatsAppUrl(contact: WhatsAppContact): string {
+    const defaultMsg = venueName
+      ? `Olá! Gostaria de informações sobre o ArenaGo na arena ${venueName}.`
+      : undefined;
+    return formatWhatsAppUrl(contact.phone_number, contact.custom_message || defaultMsg);
   }
 
-  function getWhatsAppUrl(contact: WhatsAppContact): string {
-    const cleanPhone = formatPhoneForWhatsApp(contact.phone_number);
-    const text = encodeURIComponent(
-      contact.custom_message ||
-        `Olá! Gostaria de informações sobre o ArenaGo${venueName ? ` na arena ${venueName}` : ""}.`
-    );
-    return `https://wa.me/${cleanPhone}?text=${text}`;
-  }
 
   // Se houver apenas 1 contato ativo, botão pode abrir direto ou abrir drawer
   const primaryContact = contacts.find((c) => c.is_primary) || contacts[0];
@@ -105,13 +97,13 @@ export function FloatingWhatsApp({ venueIdOrSlug, venueName }: FloatingWhatsAppP
                   Nenhum contato específico disponível no momento.
                 </p>
                 <a
-                  href={`https://wa.me/5511999998888?text=${encodeURIComponent("Olá, gostaria de ajuda na ArenaGo!")}`}
+                  href={getOfficialSupportWhatsAppUrl()}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition"
                 >
                   <Phone className="h-3.5 w-3.5" />
-                  Chamar Central Geral
+                  Central de Atendimento
                 </a>
               </div>
             ) : (
