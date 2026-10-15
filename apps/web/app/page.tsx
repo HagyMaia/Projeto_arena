@@ -27,7 +27,8 @@ import {
   Compass,
   Zap,
   Image as ImageIcon,
-  Share2
+  Share2,
+  Building2
 } from "lucide-react";
 import { api, Venue, Booking, getStoredUser, clearStoredToken } from "@/lib/api";
 import { getOfficialSupportWhatsAppUrl, OFFICIAL_SUPPORT_PHONE_RAW } from "@/lib/utils";
@@ -501,6 +502,15 @@ export default function PlayerMarketplacePage() {
                 </button>
 
                 <Link
+                  href="/cadastrar-arena"
+                  className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#ff7043]/30 bg-[#ff7043]/10 hover:bg-[#ff7043]/20 text-xs font-semibold text-[#f4511e] dark:text-[#ff7043] transition"
+                  title="Cadastre sua arena no ArenaGo"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-[#ff7043]" />
+                  <span>Cadastre sua Arena</span>
+                </Link>
+
+                <Link
                   href="/login"
                   className="px-4 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-md transition"
                 >
@@ -756,6 +766,30 @@ export default function PlayerMarketplacePage() {
               >
                 <ChevronRight className="w-5 h-5 stroke-[2.5]" />
               </a>
+            </div>
+
+            {/* Banner Cadastre sua Arena (Gestores & Complexos) */}
+            <div className="mt-4 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-950/20 via-slate-900/10 to-[#ff7043]/10 border border-emerald-500/20 dark:border-emerald-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-[#ff7043] text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white">
+                    É proprietário ou gestor de uma arena esportiva?
+                  </h4>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Aumente sua ocupação, automatize agendamentos e receba pagamentos diretamente via Pix.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/cadastrar-arena"
+                className="shrink-0 px-4 py-2 rounded-xl btn-coral-gradient text-white text-xs font-bold shadow-sm transition hover:opacity-95 whitespace-nowrap flex items-center gap-1.5"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Cadastre sua Arena</span>
+              </Link>
             </div>
           </section>
 

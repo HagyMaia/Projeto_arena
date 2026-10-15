@@ -173,6 +173,8 @@ export interface AdminVenue {
   rating_average: number;
   rating_count: number;
   is_active: boolean;
+  is_published?: boolean;
+  is_deleted?: boolean;
   owner_name?: string;
   owner_email?: string;
   owner_phone?: string;
@@ -181,6 +183,63 @@ export interface AdminVenue {
   subscription_status?: string;
   courts: AdminCourt[];
 }
+
+export interface ArenaRequestItem {
+  id: string;
+  request_number: string;
+  arena_name: string;
+  responsible_name: string;
+  whatsapp: string;
+  email: string;
+  document_type: "CPF" | "CNPJ";
+  document_number: string;
+  address_street: string;
+  address_number: string;
+  address_complement?: string | null;
+  neighborhood: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  sports_modalities?: string[] | null;
+  court_count: number;
+  operating_hours_description?: string | null;
+  description?: string | null;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  admin_notes?: string | null;
+  created_venue_id?: string | null;
+  approved_at?: string | null;
+  rejected_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ArenaRequestCreatePayload {
+  arena_name: string;
+  responsible_name: string;
+  whatsapp: string;
+  email: string;
+  document_type: "CPF" | "CNPJ";
+  document_number: string;
+  address_street: string;
+  address_number: string;
+  address_complement?: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  sports_modalities?: string[];
+  court_count?: number;
+  operating_hours_description?: string;
+  description?: string;
+}
+
+export interface ArenaRequestSubmitResponse {
+  request: ArenaRequestItem;
+  whatsapp_number: string;
+  whatsapp_message: string;
+  whatsapp_url: string;
+}
+
 
 export interface CreateVenueWithOwnerPayload {
   name: string;
@@ -570,6 +629,66 @@ export const api = {
         promo_subtext: payload.promo_subtext,
         image_url: payload.image_url,
       }),
+    });
+  },
+
+  async updateAdminVenueStatus(venueId: string, payload: { is_active?: boolean; is_published?: boolean }): Promise<any> {
+    return request(`/admin/venues/${venueId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteAdminVenue(venueId: string, permanent: boolean = false): Promise<any> {
+    const qs = permanent ? "?permanent=true" : "";
+    return request(`/admin/venues/${venueId}${qs}`, {
+      method: "DELETE",
+    });
+  },
+
+  // Arena Requests (Público e Super Admin)
+  async createArenaRequest(payload: ArenaRequestCreatePayload): Promise<ArenaRequestSubmitResponse> {
+    return request<ArenaRequestSubmitResponse>("/arena-requests", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getAdminArenaRequests(statusFilter?: string): Promise<ArenaRequestItem[]> {
+    const qs = statusFilter && statusFilter !== "ALL" ? `?status_filter=${statusFilter}` : "";
+    return request<ArenaRequestItem[]>(`/arena-requests${qs}`);
+  },
+
+  async getAdminArenaRequest(requestId: string): Promise<ArenaRequestItem> {
+    return request<ArenaRequestItem>(`/arena-requests/${requestId}`);
+  },
+
+  async approveArenaRequest(requestId: string, payload?: { 
+    decision_notes?: string; 
+    admin_notes?: string; 
+    courts_hourly_rate?: number; 
+    default_hourly_rate?: number; 
+    manager_password?: string;
+    temporary_password?: string;
+  }): Promise<any> {
+    const bodyPayload = {
+      decision_notes: payload?.decision_notes || payload?.admin_notes,
+      courts_hourly_rate: payload?.courts_hourly_rate ?? payload?.default_hourly_rate,
+      manager_password: payload?.manager_password || payload?.temporary_password,
+    };
+    return request(`/arena-requests/${requestId}/approve`, {
+      method: "POST",
+      body: JSON.stringify(bodyPayload),
+    });
+  },
+
+  async rejectArenaRequest(requestId: string, payload?: { decision_notes?: string; admin_notes?: string }): Promise<any> {
+    const bodyPayload = {
+      decision_notes: payload?.decision_notes || payload?.admin_notes,
+    };
+    return request(`/arena-requests/${requestId}/reject`, {
+      method: "POST",
+      body: JSON.stringify(bodyPayload),
     });
   },
 

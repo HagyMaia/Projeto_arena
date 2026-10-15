@@ -39,6 +39,9 @@ async def lifespan(app: FastAPI):
             await conn.execute(text("ALTER TABLE payments ADD COLUMN IF NOT EXISTS refunded_amount NUMERIC(10, 2) DEFAULT 0;"))
             await conn.execute(text("ALTER TABLE payments ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP WITH TIME ZONE;"))
             await conn.execute(text("ALTER TABLE payments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE;"))
+            # Colunas de publicação e exclusão lógica de Arenas
+            await conn.execute(text("ALTER TABLE venues ADD COLUMN IF NOT EXISTS is_published BOOLEAN DEFAULT TRUE;"))
+            await conn.execute(text("ALTER TABLE venues ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;"))
         except Exception as e:
             logger.warning(f"Aviso de migração de colunas: {e}")
     logger.info("Tabelas verificadas e criadas.")

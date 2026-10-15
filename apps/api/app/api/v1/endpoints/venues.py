@@ -31,7 +31,11 @@ async def list_venues(
     max_price: Optional[Decimal] = Query(None, description="Preço máximo por hora"),
     db: AsyncSession = Depends(get_db)
 ):
-    query = select(Venue).where(Venue.is_active.is_(True)).options(
+    query = select(Venue).where(
+        Venue.is_active.is_(True),
+        Venue.is_published.is_(True),
+        Venue.is_deleted.is_(False)
+    ).options(
         selectinload(Venue.courts)
     )
 

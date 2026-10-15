@@ -186,7 +186,9 @@ export default function MarketplaceHomePage() {
     },
     {
       q: "Sou Gestor de Arena, como posso cadastrar meu complexo?",
-      a: "Temos uma área exclusiva para proprietários e gestores! Basta acessar nosso ambiente administrativo para cadastrar quadras, fotos, valores personalizados e gerenciar sua timeline operacional diária."
+      a: "Temos um fluxo rápido e direto para novos parceiros! Clique no botão abaixo para preencher o formulário oficial de solicitação. Nossa equipe analisa e ativa sua arena em instantes no marketplace com recebimento automático via Pix.",
+      actionLink: "/cadastrar-arena",
+      actionText: "Cadastre sua Arena Agora"
     }
   ];
 
@@ -1012,9 +1014,22 @@ export default function MarketplaceHomePage() {
                 </button>
 
                 {isOpen && (
-                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 leading-relaxed animate-in fade-in duration-200">
-                    {item.a}
-                  </p>
+                  <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 leading-relaxed animate-in fade-in duration-200">
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      {item.a}
+                    </p>
+                    {item.actionLink && (
+                      <div className="mt-3">
+                        <Link
+                          href={item.actionLink}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl btn-coral-gradient text-white text-xs font-bold shadow-xs transition hover:opacity-95"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>{item.actionText || "Cadastrar Arena"}</span>
+                        </Link>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             );

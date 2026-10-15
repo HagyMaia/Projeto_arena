@@ -187,6 +187,8 @@ async def list_admin_venues(
             "rating_average": v.rating_average,
             "rating_count": v.rating_count,
             "is_active": v.is_active,
+            "is_published": getattr(v, "is_published", True),
+            "is_deleted": getattr(v, "is_deleted", False),
             "owner_name": owner_name or "Gestor Responsável",
             "owner_email": owner_email or "gestor@arena.com.br",
             "owner_phone": owner_phone or v.phone,
@@ -197,6 +199,80 @@ async def list_admin_venues(
         })
 
     return items
+
+
+from pydantic import BaseModel
+
+class VenueStatusUpdate(BaseModel):
+    is_active: Optional[bool] = None
+    is_published: Optional[bool] = None
+
+
+@router.patch("/venues/{venue_id}/status")
+async def update_venue_status(
+    venue_id: str,
+    data: VenueStatusUpdate,
+    payload: dict = Depends(require_roles("SUPERADMIN")),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    SuperAdmin: Ativa/suspende ou publica/despublica uma arena no marketplace.
+    """
+    venue_res = await db.execute(select(Venue).where(Venue.id == venue_id))
+    venue = venue_res.scalar_one_or_none()
+    if not venue:
+        raise HTTPException(status_code=404, detail="Arena não encontrada.")
+
+    if data.is_active is not None:
+        venue.is_active = data.is_active
+    if data.is_published is not None:
+        venue.is_published = data.is_published
+
+    await db.commit()
+    return {
+        "id": venue.id,
+        "name": venue.name,
+        "is_active": venue.is_active,
+        "is_published": venue.is_published,
+        "message": f"Status da arena '{venue.name}' atualizado com sucesso."
+    }
+
+
+@router.delete("/venues/{venue_id}")
+async def delete_venue_logical(
+    venue_id: str,
+    permanent: bool = Query(False, description="Exclusão física permanente (apenas se já inativa)"),
+    payload: dict = Depends(require_roles("SUPERADMIN")),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    SuperAdmin: Exclusão lógica de arenas (ou reativação/física).
+    """
+    venue_res = await db.execute(select(Venue).where(Venue.id == venue_id))
+    venue = venue_res.scalar_one_or_none()
+    if not venue:
+        raise HTTPException(status_code=404, detail="Arena não encontrada.")
+
+    if permanent:
+        await db.delete(venue)
+        await db.commit()
+        return {"id": venue_id, "message": f"Arena '{venue.name}' excluída permanentemente."}
+
+    # Exclusão lógica (soft delete)
+    venue.is_deleted = True
+    venue.is_active = False
+    venue.is_published = False
+
+    await db.commit()
+    return {
+        "id": venue.id,
+        "name": venue.name,
+        "is_deleted": True,
+        "is_active": False,
+        "is_published": False,
+        "message": f"Arena '{venue.name}' desativada e movida para a lixeira (exclusão lógica)."
+    }
+
 
 
 @router.post("/venues", status_code=status.HTTP_201_CREATED)

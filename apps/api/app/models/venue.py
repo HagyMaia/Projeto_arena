@@ -30,6 +30,8 @@ class Venue(Base):
     rating_average = Column(Float, default=5.0)
     rating_count = Column(Integer, default=0)
     is_active = Column(Boolean, default=True, nullable=False)
+    is_published = Column(Boolean, default=True, nullable=False)
+    is_deleted = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 

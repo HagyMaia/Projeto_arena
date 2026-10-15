@@ -5,6 +5,8 @@ from app.models.booking import Booking, CourtBlock
 from app.models.payment import Payment, PaymentEventLog, VenuePaymentAccount
 from app.models.subscription import Plan, Subscription
 
+from app.models.arena_request import ArenaRequest
+
 __all__ = [
     "User",
     "Organization",
@@ -21,5 +23,6 @@ __all__ = [
     "PaymentEventLog",
     "Plan",
     "Subscription",
+    "ArenaRequest",
 ]
 

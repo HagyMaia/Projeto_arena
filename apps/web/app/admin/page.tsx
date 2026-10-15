@@ -34,7 +34,11 @@ import {
   Eye,
   MessageCircle,
   ExternalLink,
-  Trash2
+  Trash2,
+  XCircle,
+  Inbox,
+  EyeOff,
+  FileText
 } from "lucide-react";
 import { 
   api, 
@@ -48,6 +52,7 @@ import {
   WhatsAppContact,
   CreateWhatsAppContactPayload,
   UpdateWhatsAppContactPayload,
+  ArenaRequestItem,
   getStoredUser
 } from "@/lib/api";
 import { formatWhatsAppUrl } from "@/lib/utils";
@@ -63,10 +68,22 @@ const PRESET_VENUE_IMAGES = [
 
 export default function SuperAdminPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"arenas" | "pricing" | "saas" | "financial" | "whatsapp">("arenas");
+  const [activeTab, setActiveTab] = useState<"arenas" | "requests" | "pricing" | "saas" | "financial" | "whatsapp">("arenas");
   const [metrics, setMetrics] = useState<AdminMetrics | null>(null);
   const [subscriptions, setSubscriptions] = useState<AdminSubscription[]>([]);
   const [venues, setVenues] = useState<AdminVenue[]>([]);
+  const [arenaRequests, setArenaRequests] = useState<ArenaRequestItem[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [requestFilter, setRequestFilter] = useState<"ALL" | "PENDING" | "APPROVED" | "REJECTED">("ALL");
+  const [requestSearch, setRequestSearch] = useState("");
+  const [selectedRequest, setSelectedRequest] = useState<ArenaRequestItem | null>(null);
+  const [isViewRequestModalOpen, setIsViewRequestModalOpen] = useState(false);
+  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const [approvalHourlyRate, setApprovalHourlyRate] = useState<number>(100);
+  const [approvalPassword, setApprovalPassword] = useState<string>("ArenaGo@2026");
+  const [approvalNotes, setApprovalNotes] = useState<string>("");
+  const [rejectionNotes, setRejectionNotes] = useState<string>("");
   const [adminFinancial, setAdminFinancial] = useState<{
     gmv_volume: number;
     platform_fee_revenue: number;
@@ -379,6 +396,18 @@ export default function SuperAdminPage() {
     }
   };
 
+  const loadArenaRequests = async () => {
+    setRequestsLoading(true);
+    try {
+      const res = await api.getAdminArenaRequests();
+      setArenaRequests(res || []);
+    } catch {
+      setArenaRequests([]);
+    } finally {
+      setRequestsLoading(false);
+    }
+  };
+
   useEffect(() => {
     // RBAC: strictly verify user role
     const user = getStoredUser();
@@ -396,11 +425,105 @@ export default function SuperAdminPage() {
     }
     loadData();
     loadWhatsAppContacts();
+    loadArenaRequests();
   }, []);
 
   const showNotification = (type: "success" | "error", text: string) => {
     setFeedbackMessage({ type, text });
     setTimeout(() => setFeedbackMessage(null), 5000);
+  };
+
+  // Arena Status & Visibility Handlers
+  const handleToggleVenueActive = async (venue: AdminVenue) => {
+    const nextState = !venue.is_active;
+    try {
+      await api.updateAdminVenueStatus(venue.id, { is_active: nextState });
+      showNotification("success", `Arena "${venue.name}" ${nextState ? "ativada" : "suspensa"} com sucesso.`);
+      setVenues((prev) => prev.map((v) => (v.id === venue.id ? { ...v, is_active: nextState } : v)));
+    } catch (err: any) {
+      showNotification("error", `Erro ao alterar status: ${err.message || "Falha na operação"}`);
+    }
+  };
+
+  const handleToggleVenuePublished = async (venue: AdminVenue) => {
+    const currentPublished = venue.is_published !== false;
+    const nextPublished = !currentPublished;
+    try {
+      await api.updateAdminVenueStatus(venue.id, { is_published: nextPublished });
+      showNotification("success", `Arena "${venue.name}" ${nextPublished ? "publicada no marketplace" : "oculta do marketplace"}.`);
+      setVenues((prev) => prev.map((v) => (v.id === venue.id ? { ...v, is_published: nextPublished } : v)));
+    } catch (err: any) {
+      showNotification("error", `Erro ao alterar visibilidade: ${err.message || "Falha na operação"}`);
+    }
+  };
+
+  const handleDeleteVenue = async (venue: AdminVenue) => {
+    const confirmed = window.confirm(`Atenção: Deseja realmente excluir logicamente a arena "${venue.name}"?\nEla será ocultada do portal e arquivada.`);
+    if (!confirmed) return;
+    try {
+      await api.deleteAdminVenue(venue.id);
+      showNotification("success", `Arena "${venue.name}" excluída logicamente com sucesso.`);
+      setVenues((prev) => prev.filter((v) => v.id !== venue.id));
+    } catch (err: any) {
+      showNotification("error", `Erro ao excluir arena: ${err.message || "Falha na operação"}`);
+    }
+  };
+
+  // Arena Request Handlers
+  const handleOpenApproveRequest = (req: ArenaRequestItem) => {
+    setSelectedRequest(req);
+    setApprovalHourlyRate(100);
+    setApprovalPassword("ArenaGo@2026");
+    setApprovalNotes(`Aprovado pela administração em ${new Date().toLocaleDateString("pt-BR")}. Contato: ${req.whatsapp}`);
+    setIsApproveModalOpen(true);
+  };
+
+  const handleOpenRejectRequest = (req: ArenaRequestItem) => {
+    setSelectedRequest(req);
+    setRejectionNotes("");
+    setIsRejectModalOpen(true);
+  };
+
+  const handleConfirmApproveRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRequest) return;
+    setSubmitting(true);
+    try {
+      const res = await api.approveArenaRequest(selectedRequest.id, {
+        decision_notes: approvalNotes,
+        courts_hourly_rate: Number(approvalHourlyRate) || 100,
+        manager_password: approvalPassword || "ArenaGo@2026",
+      });
+      showNotification("success", `Solicitação #${selectedRequest.request_number} aprovada com sucesso! A arena "${res.arena_name || selectedRequest.arena_name}" foi criada e ativada.`);
+      setIsApproveModalOpen(false);
+      setIsViewRequestModalOpen(false);
+      await Promise.all([loadArenaRequests(), loadData()]);
+    } catch (err: any) {
+      showNotification("error", `Erro ao aprovar solicitação: ${err.message || "Falha na aprovação"}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleConfirmRejectRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRequest) return;
+    if (!rejectionNotes.trim()) {
+      showNotification("error", "Por favor, informe a justificativa da rejeição.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await api.rejectArenaRequest(selectedRequest.id, { decision_notes: rejectionNotes });
+      showNotification("success", `Solicitação #${selectedRequest.request_number} foi rejeitada.`);
+      setIsRejectModalOpen(false);
+      setIsViewRequestModalOpen(false);
+      await loadArenaRequests();
+    } catch (err: any) {
+      showNotification("error", `Erro ao rejeitar solicitação: ${err.message || "Falha na rejeição"}`);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // WhatsApp Admin Handlers
@@ -722,6 +845,22 @@ export default function SuperAdminPage() {
     );
   });
 
+  // Filter arena requests
+  const filteredArenaRequests = arenaRequests.filter((r) => {
+    if (requestFilter !== "ALL" && r.status !== requestFilter) {
+      return false;
+    }
+    if (!requestSearch) return true;
+    const q = requestSearch.toLowerCase();
+    return (
+      r.arena_name.toLowerCase().includes(q) ||
+      r.responsible_name.toLowerCase().includes(q) ||
+      r.request_number.toLowerCase().includes(q) ||
+      r.email.toLowerCase().includes(q) ||
+      (r.city && r.city.toLowerCase().includes(q))
+    );
+  });
+
   // Calculate pricing preview for modal
   const calcBaseRate = Number(pricingForm.default_hourly_rate) || 0;
   const calcDiscountPercent = Number(pricingForm.discount_percentage) || 0;
@@ -785,11 +924,12 @@ export default function SuperAdminPage() {
               onClick={() => {
                 loadData();
                 loadWhatsAppContacts();
+                loadArenaRequests();
               }}
               className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition"
               title="Atualizar dados"
             >
-              <RefreshCw className={`w-4 h-4 ${loading || whatsappLoading ? "animate-spin text-emerald-400" : ""}`} />
+              <RefreshCw className={`w-4 h-4 ${loading || whatsappLoading || requestsLoading ? "animate-spin text-emerald-400" : ""}`} />
             </button>
 
             <button
@@ -904,10 +1044,10 @@ export default function SuperAdminPage() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex items-center gap-2 border-b border-slate-800">
+        <div className="flex items-center gap-2 border-b border-slate-800 overflow-x-auto pb-px">
           <button
             onClick={() => setActiveTab("arenas")}
-            className={`pb-3 px-4 text-sm font-semibold flex items-center gap-2 border-b-2 transition ${
+            className={`pb-3 px-4 text-sm font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap ${
               activeTab === "arenas"
                 ? "border-emerald-500 text-emerald-400"
                 : "border-transparent text-slate-400 hover:text-slate-200"
@@ -915,6 +1055,23 @@ export default function SuperAdminPage() {
           >
             <Building className="w-4 h-4" />
             Arenas & Proprietários ({venues.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab("requests")}
+            className={`pb-3 px-4 text-sm font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap ${
+              activeTab === "requests"
+                ? "border-emerald-500 text-emerald-400"
+                : "border-transparent text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <Inbox className="w-4 h-4" />
+            Solicitações de Cadastro ({arenaRequests.length})
+            {arenaRequests.filter(r => r.status === "PENDING").length > 0 && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
+                {arenaRequests.filter(r => r.status === "PENDING").length} pendente(s)
+              </span>
+            )}
           </button>
 
           <button
@@ -1001,13 +1158,22 @@ export default function SuperAdminPage() {
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
                     
-                    <div className="absolute top-3 left-3 flex items-center gap-2">
+                    <div className="absolute top-3 left-3 flex flex-wrap items-center gap-2">
                       <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/90 text-white backdrop-blur-md shadow">
                         {venue.subscription_plan || "Professional"}
                       </span>
-                      {venue.is_active && (
+                      {venue.is_active ? (
                         <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-900/80 text-emerald-400 border border-emerald-500/30 backdrop-blur-md flex items-center gap-1">
                           <CheckCircle2 className="w-3 h-3" /> Ativa
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-900/80 text-amber-400 border border-amber-500/30 backdrop-blur-md flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" /> Suspensa
+                        </span>
+                      )}
+                      {venue.is_published === false && (
+                        <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-900/80 text-rose-400 border border-rose-500/30 backdrop-blur-md flex items-center gap-1">
+                          <EyeOff className="w-3 h-3" /> Oculta no Portal
                         </span>
                       )}
                     </div>
@@ -1141,10 +1307,57 @@ export default function SuperAdminPage() {
                   </div>
 
                   {/* Actions Footer */}
-                  <div className="p-4 bg-slate-950/70 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                    <span className="text-slate-500">
-                      ID: <span className="font-mono text-slate-400">{venue.id}</span>
-                    </span>
+                  <div className="p-4 bg-slate-950/70 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => handleToggleVenueActive(venue)}
+                        className={`px-2.5 py-1.5 rounded-lg border font-semibold transition flex items-center gap-1.5 ${
+                          venue.is_active
+                            ? "bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20"
+                            : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                        }`}
+                        title={venue.is_active ? "Suspender arena" : "Ativar arena"}
+                      >
+                        {venue.is_active ? (
+                          <>
+                            <AlertTriangle className="w-3.5 h-3.5" /> Suspender
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Ativar
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => handleToggleVenuePublished(venue)}
+                        className={`px-2.5 py-1.5 rounded-lg border font-semibold transition flex items-center gap-1.5 ${
+                          venue.is_published !== false
+                            ? "bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700"
+                            : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                        }`}
+                        title={venue.is_published !== false ? "Ocultar do marketplace" : "Publicar no marketplace"}
+                      >
+                        {venue.is_published !== false ? (
+                          <>
+                            <EyeOff className="w-3.5 h-3.5 text-slate-400" /> Ocultar
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="w-3.5 h-3.5 text-emerald-400" /> Publicar
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteVenue(venue)}
+                        className="px-2.5 py-1.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 font-semibold transition flex items-center gap-1.5"
+                        title="Excluir logicamente esta arena"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Excluir
+                      </button>
+                    </div>
+
                     <button
                       onClick={() => handleOpenVenueModal(venue)}
                       className="text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1 transition"
@@ -1155,6 +1368,252 @@ export default function SuperAdminPage() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* TAB: SOLICITAÇÕES DE CADASTRO */}
+        {activeTab === "requests" && (
+          <div className="space-y-6">
+            <div className="p-6 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-slate-900 to-teal-950/30 border border-emerald-500/30 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    Novos Parceiros & Arenas
+                  </span>
+                  <span className="text-xs text-slate-400">
+                    Suporte WhatsApp Oficial: <strong>+55 (92) 98492-3316</strong>
+                  </span>
+                </div>
+                <h2 className="text-xl font-black text-white">
+                  Solicitações Públicas de Cadastro de Arenas
+                </h2>
+                <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+                  Avalie pedidos de cadastro enviados por novos gestores através do formulário público (/cadastrar-arena) e do canal direto de WhatsApp. Ao aprovar, o sistema converte automaticamente a solicitação em um complexo esportivo ativo, cria o gestor responsável e disponibiliza a arena no marketplace.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={loadArenaRequests}
+                  className="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-semibold transition flex items-center gap-2 shadow-xs"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${requestsLoading ? "animate-spin text-emerald-400" : ""}`} />
+                  Atualizar Lista
+                </button>
+                <Link
+                  href="/cadastrar-arena"
+                  target="_blank"
+                  className="px-3.5 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 text-xs font-semibold transition flex items-center gap-1.5 shadow-xs"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Abrir Formulário Público
+                </Link>
+              </div>
+            </div>
+
+            {/* Filter Pills and Search */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setRequestFilter("ALL")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                    requestFilter === "ALL"
+                      ? "bg-slate-800 text-white border border-slate-700"
+                      : "bg-slate-900/60 text-slate-400 hover:text-white border border-transparent"
+                  }`}
+                >
+                  Todas ({arenaRequests.length})
+                </button>
+                <button
+                  onClick={() => setRequestFilter("PENDING")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                    requestFilter === "PENDING"
+                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                      : "bg-slate-900/60 text-slate-400 hover:text-amber-300 border border-transparent"
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                  Pendentes ({arenaRequests.filter((r) => r.status === "PENDING").length})
+                </button>
+                <button
+                  onClick={() => setRequestFilter("APPROVED")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                    requestFilter === "APPROVED"
+                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                      : "bg-slate-900/60 text-slate-400 hover:text-emerald-300 border border-transparent"
+                  }`}
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  Aprovadas ({arenaRequests.filter((r) => r.status === "APPROVED").length})
+                </button>
+                <button
+                  onClick={() => setRequestFilter("REJECTED")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                    requestFilter === "REJECTED"
+                      ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                      : "bg-slate-900/60 text-slate-400 hover:text-rose-300 border border-transparent"
+                  }`}
+                >
+                  <XCircle className="w-3.5 h-3.5 text-rose-400" />
+                  Rejeitadas ({arenaRequests.filter((r) => r.status === "REJECTED").length})
+                </button>
+              </div>
+
+              <div className="relative w-full sm:w-80">
+                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Filtrar por arena, protocolo, responsável..."
+                  value={requestSearch}
+                  onChange={(e) => setRequestSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
+                />
+              </div>
+            </div>
+
+            {/* List / Cards */}
+            {filteredArenaRequests.length === 0 ? (
+              <div className="p-12 rounded-2xl bg-slate-900/40 border border-slate-800/80 text-center space-y-3">
+                <Inbox className="w-10 h-10 text-slate-600 mx-auto" />
+                <h3 className="text-base font-bold text-slate-300">Nenhuma solicitação encontrada</h3>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  {requestFilter !== "ALL"
+                    ? `Não há solicitações com o status selecionado (${requestFilter}).`
+                    : "As novas solicitações enviadas através do formulário de cadastro de arenas (/cadastrar-arena) aparecerão aqui."}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredArenaRequests.map((req) => {
+                  const isPending = req.status === "PENDING";
+                  const isApproved = req.status === "APPROVED";
+                  const isRejected = req.status === "REJECTED";
+                  const cleanPhone = (req.whatsapp || "").replace(/\D/g, "");
+                  const waLink = cleanPhone ? `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(`Olá ${req.responsible_name}! Sou da equipe ArenaGo a respeito da solicitação #${req.request_number} da arena ${req.arena_name}.`)}` : null;
+
+                  return (
+                    <div
+                      key={req.id}
+                      className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800/90 hover:border-slate-700 transition space-y-4 shadow-sm"
+                    >
+                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                        <div className="space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="px-2.5 py-0.5 rounded-lg text-[11px] font-mono font-bold bg-slate-800 text-emerald-400 border border-slate-700">
+                              #{req.request_number}
+                            </span>
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 ${
+                                isPending
+                                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                                  : isApproved
+                                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                                  : "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                              }`}
+                            >
+                              {isPending && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />}
+                              {isApproved && <CheckCircle2 className="w-3 h-3" />}
+                              {isRejected && <XCircle className="w-3 h-3" />}
+                              {req.status === "PENDING" ? "Pendente de Análise" : req.status === "APPROVED" ? "Aprovada e Publicada" : "Rejeitada"}
+                            </span>
+                            <span className="text-[11px] text-slate-500">
+                              {new Date(req.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          </div>
+
+                          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                            <span>{req.arena_name}</span>
+                            <span className="text-xs font-normal text-slate-400">
+                              • {req.city}/{req.state}
+                            </span>
+                          </h3>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          {waLink && (
+                            <a
+                              href={waLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 text-xs font-semibold transition flex items-center gap-1.5 shadow-xs"
+                              title="Conversar com o responsável no WhatsApp"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                              WhatsApp Gestor
+                            </a>
+                          )}
+
+                          <button
+                            onClick={() => {
+                              setSelectedRequest(req);
+                              setIsViewRequestModalOpen(true);
+                            }}
+                            className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition flex items-center gap-1.5"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-slate-400" />
+                            Ver Ficha
+                          </button>
+
+                          {isPending && (
+                            <>
+                              <button
+                                onClick={() => handleOpenApproveRequest(req)}
+                                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-emerald-500/20"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                Aprovar Arena
+                              </button>
+
+                              <button
+                                onClick={() => handleOpenRejectRequest(req)}
+                                className="px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 text-xs font-semibold transition flex items-center gap-1.5"
+                              >
+                                <XCircle className="w-3.5 h-3.5" />
+                                Rejeitar
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Summary Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs pt-3 border-t border-slate-800/80">
+                        <div>
+                          <span className="text-[11px] text-slate-500 uppercase block font-semibold">Responsável</span>
+                          <span className="text-slate-200 font-medium">{req.responsible_name}</span>
+                          <span className="text-[11px] text-slate-400 block">{req.email}</span>
+                        </div>
+
+                        <div>
+                          <span className="text-[11px] text-slate-500 uppercase block font-semibold">WhatsApp & Doc</span>
+                          <span className="text-slate-200 font-medium">{req.whatsapp || "Não informado"}</span>
+                          <span className="text-[11px] text-slate-400 block">{req.document_type}: {req.document_number}</span>
+                        </div>
+
+                        <div>
+                          <span className="text-[11px] text-slate-500 uppercase block font-semibold">Modalidades / Quadras</span>
+                          <span className="text-slate-200 font-medium">
+                            {Array.isArray(req.sports_modalities) ? req.sports_modalities.join(", ") : "Poliesportivo"}
+                          </span>
+                          <span className="text-[11px] text-slate-400 block">{req.court_count} quadra(s) solicitada(s)</span>
+                        </div>
+
+                        <div>
+                          <span className="text-[11px] text-slate-500 uppercase block font-semibold">Localização</span>
+                          <span className="text-slate-200 font-medium truncate block">
+                            {req.address_street ? `${req.address_street}, ${req.address_number || "S/N"}` : "Endereço a detalhar"}
+                          </span>
+                          <span className="text-[11px] text-slate-400 block">
+                            {req.neighborhood ? `${req.neighborhood} • ` : ""}{req.city}/{req.state}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -2519,6 +2978,363 @@ export default function SuperAdminPage() {
                     className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-semibold text-sm shadow-lg shadow-emerald-500/20 transition disabled:opacity-50"
                   >
                     {submitting ? "Salvando..." : (editingWhatsAppContact ? "Salvar Alterações" : "Cadastrar Canal")}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: VISUALIZAR FICHA DA SOLICITAÇÃO */}
+        {isViewRequestModalOpen && selectedRequest && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+            <div className="relative w-full max-w-2xl my-8 bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl text-slate-100 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xl font-bold text-white">Solicitação #{selectedRequest.request_number}</h2>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                          selectedRequest.status === "PENDING"
+                            ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                            : selectedRequest.status === "APPROVED"
+                            ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                            : "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                        }`}
+                      >
+                        {selectedRequest.status === "PENDING" ? "Pendente" : selectedRequest.status === "APPROVED" ? "Aprovada" : "Rejeitada"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Recebida em {new Date(selectedRequest.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsViewRequestModalOpen(false)}
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-6 text-xs">
+                {/* Arena Details */}
+                <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
+                  <h3 className="font-bold text-emerald-400 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <Building className="w-4 h-4" /> Informações da Arena Solicitada
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-slate-300">
+                    <div>
+                      <span className="text-slate-500 block">Nome Comercial:</span>
+                      <strong className="text-white text-sm">{selectedRequest.arena_name}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">Modalidades Esportivas:</span>
+                      <strong className="text-white">
+                        {Array.isArray(selectedRequest.sports_modalities) ? selectedRequest.sports_modalities.join(", ") : "Poliesportivo"}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">Quantidade de Quadras:</span>
+                      <strong className="text-white">{selectedRequest.court_count} quadra(s)</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">Horário de Funcionamento:</span>
+                      <span className="text-slate-200">{selectedRequest.operating_hours_description || "Não especificado"}</span>
+                    </div>
+                  </div>
+
+                  {selectedRequest.description && (
+                    <div className="pt-2 border-t border-slate-800/80">
+                      <span className="text-slate-500 block mb-1">Descrição / Diferenciais:</span>
+                      <p className="text-slate-300 leading-relaxed bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
+                        {selectedRequest.description}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Responsible Person */}
+                <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
+                  <h3 className="font-bold text-purple-400 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <Users className="w-4 h-4" /> Dados do Gestor / Responsável
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-slate-300">
+                    <div>
+                      <span className="text-slate-500 block">Nome:</span>
+                      <strong className="text-white text-sm">{selectedRequest.responsible_name}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">E-mail:</span>
+                      <strong className="text-white">{selectedRequest.email}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">WhatsApp:</span>
+                      <strong className="text-white">{selectedRequest.whatsapp}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">Documento ({selectedRequest.document_type}):</span>
+                      <strong className="text-white font-mono">{selectedRequest.document_number}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Location */}
+                <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
+                  <h3 className="font-bold text-rose-400 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4" /> Localização & Endereço
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-slate-300">
+                    <div className="col-span-full">
+                      <span className="text-slate-500 block">Logradouro:</span>
+                      <strong className="text-white">
+                        {selectedRequest.address_street || "Não informado"}, {selectedRequest.address_number || "S/N"}
+                        {selectedRequest.address_complement ? ` - Comp: ${selectedRequest.address_complement}` : ""}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">Bairro:</span>
+                      <strong className="text-white">{selectedRequest.neighborhood || "Centro"}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">Cidade / Estado:</span>
+                      <strong className="text-white">{selectedRequest.city} / {selectedRequest.state}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">CEP:</span>
+                      <strong className="text-white font-mono">{selectedRequest.postal_code || "Não informado"}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Audit and Decision Info */}
+                {selectedRequest.admin_notes && (
+                  <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1">
+                    <span className="text-slate-500 block font-semibold uppercase text-[10px]">Notas da Administração:</span>
+                    <p className="text-slate-300 italic">{selectedRequest.admin_notes}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer Actions */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-6 mt-6 border-t border-slate-800">
+                <div>
+                  {selectedRequest.whatsapp && (
+                    <a
+                      href={`https://wa.me/55${selectedRequest.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(`Olá ${selectedRequest.responsible_name}! Sou da equipe ArenaGo a respeito da solicitação #${selectedRequest.request_number} da arena ${selectedRequest.arena_name}.`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3.5 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 text-xs font-semibold transition flex items-center gap-1.5 shadow-xs"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      Conversar no WhatsApp
+                    </a>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsViewRequestModalOpen(false)}
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition"
+                  >
+                    Fechar
+                  </button>
+
+                  {selectedRequest.status === "PENDING" && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsViewRequestModalOpen(false);
+                          handleOpenRejectRequest(selectedRequest);
+                        }}
+                        className="px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 text-xs font-bold transition flex items-center gap-1.5"
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                        Rejeitar
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsViewRequestModalOpen(false);
+                          handleOpenApproveRequest(selectedRequest);
+                        }}
+                        className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-emerald-500/20"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Aprovar e Criar Arena
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: APROVAR SOLICITAÇÃO & CRIAR ARENA */}
+        {isApproveModalOpen && selectedRequest && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+            <div className="relative w-full max-w-xl my-8 bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl text-slate-100">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-white">Aprovar Solicitação #{selectedRequest.request_number}</h2>
+                    <p className="text-xs text-slate-400">Conversão automática para Arena ativa e usuário Gestor</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsApproveModalOpen(false)}
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleConfirmApproveRequest} className="space-y-4 text-xs">
+                {/* Confirmation Box */}
+                <div className="p-4 rounded-2xl bg-emerald-950/30 border border-emerald-500/30 space-y-2">
+                  <div className="font-semibold text-emerald-300 text-sm">
+                    {selectedRequest.arena_name}
+                  </div>
+                  <p className="text-slate-300 text-xs leading-relaxed">
+                    Ao confirmar a aprovação, o sistema criará a Organização, a Arena com status <strong>ATIVA</strong> e <strong>PUBLICADA</strong> no marketplace, a conta do gestor <strong>{selectedRequest.responsible_name}</strong> ({selectedRequest.email}) e gerará as {selectedRequest.court_count} quadras configuradas.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Valor Padrão da Hora das Quadras (R$) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="10"
+                    required
+                    value={approvalHourlyRate}
+                    onChange={(e) => setApprovalHourlyRate(Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Valor base por hora para as quadras criadas. O gestor poderá customizar depois.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Senha Temporária de Acesso do Gestor *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={approvalPassword}
+                    onChange={(e) => setApprovalPassword(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Caso o e-mail já possua cadastro, a senha anterior será mantida e a permissão será elevada para GESTOR (MANAGER).
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Notas da Decisão / Anotações Internas
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={approvalNotes}
+                    onChange={(e) => setApprovalNotes(e.target.value)}
+                    placeholder="Ex: Aprovado após validação cadastral e contato telefônico."
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setIsApproveModalOpen(false)}
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 transition disabled:opacity-50"
+                  >
+                    {submitting ? "Criando Arena..." : "Confirmar Aprovação & Publicar"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: REJEITAR SOLICITAÇÃO */}
+        {isRejectModalOpen && selectedRequest && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+            <div className="relative w-full max-w-md my-8 bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl text-slate-100">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                    <XCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-white">Rejeitar Solicitação #{selectedRequest.request_number}</h2>
+                    <p className="text-xs text-slate-400">{selectedRequest.arena_name}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsRejectModalOpen(false)}
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleConfirmRejectRequest} className="space-y-4 text-xs">
+                <div className="p-3.5 rounded-2xl bg-rose-950/30 border border-rose-500/30 text-rose-300 text-xs">
+                  Atenção: A solicitação será marcada como rejeitada e nenhuma arena ou gestor será criado na plataforma.
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Motivo da Rejeição / Justificativa *
+                  </label>
+                  <textarea
+                    required
+                    rows={3}
+                    value={rejectionNotes}
+                    onChange={(e) => setRejectionNotes(e.target.value)}
+                    placeholder="Ex: Documentação de CNPJ inconsistente ou arena fora da área de cobertura."
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-rose-500"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setIsRejectModalOpen(false)}
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg shadow-rose-600/20 transition disabled:opacity-50"
+                  >
+                    {submitting ? "Processando..." : "Confirmar Rejeição"}
                   </button>
                 </div>
               </form>
