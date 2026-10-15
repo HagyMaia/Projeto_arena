@@ -25,6 +25,8 @@ class Token(BaseModel):
     role: str
     user_id: str
     full_name: str
+    email: Optional[str] = None
+
 
 
 class UserResponse(UserBase):

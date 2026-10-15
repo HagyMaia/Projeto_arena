@@ -1,5 +1,7 @@
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -7,8 +9,14 @@ from sqlalchemy.orm import selectinload
 from app.core.database import get_db
 from app.core.security import get_current_user_payload
 from app.models.booking import Booking
+from app.models.user import User
+from app.models.venue import Court, Venue
 from app.schemas.booking import BookingCreate, BookingResponse
 from app.services.booking_service import create_booking_with_lock
+from app.services.email_service import (
+    generate_booking_confirmation_html,
+    send_booking_confirmation_email,
+)
 
 router = APIRouter(prefix="/bookings", tags=["Reservas de Jogadores"])
 
@@ -21,7 +29,64 @@ async def create_booking(
 ):
     user_id = payload.get("sub")
     booking = await create_booking_with_lock(db=db, user_id=user_id, data=booking_in)
-    return booking
+
+    # Obter dados do usuário para personalização e envio de email
+    u_res = await db.execute(select(User).where(User.id == user_id))
+    user = u_res.scalar_one_or_none()
+
+    # Obter dados da quadra e arena parceira
+    c_res = await db.execute(
+        select(Court).where(Court.id == booking.court_id).options(selectinload(Court.venue))
+    )
+    court = c_res.scalar_one_or_none()
+
+    c_name = court.name if court else "Quadra Esportiva"
+    s_type = court.sport_type if court else "Esporte"
+    v_name = court.venue.name if (court and court.venue) else "ArenaGo Partner"
+    v_addr = (
+        f"{court.venue.address_street}, n. {court.venue.address_number}, {court.venue.neighborhood}, {court.venue.city} - {court.venue.state}"
+        if (court and court.venue)
+        else ""
+    )
+
+    # Disparo de e-mail de confirmação ao jogador
+    player_email = user.email if user else "jogador@arenago.com.br"
+    player_name = user.full_name if user else "Atleta ArenaGo"
+    date_formatted = booking.start_time.strftime("%d/%m")
+    time_range = f"{booking.start_time.strftime('%H:%M')} às {booking.end_time.strftime('%H:%M')}"
+    booking_code = f"{booking.id[:8].upper()}"
+
+    await send_booking_confirmation_email(
+        to_email=player_email,
+        player_name=player_name,
+        booking_code=booking_code,
+        venue_name=v_name,
+        court_name=c_name,
+        date_formatted=date_formatted,
+        time_range=time_range,
+        total_amount=float(booking.total_amount),
+        payment_method=booking.payment_method or "PIX"
+    )
+
+    return BookingResponse(
+        id=booking.id,
+        court_id=booking.court_id,
+        user_id=booking.user_id,
+        booking_type=booking.booking_type,
+        start_time=booking.start_time,
+        end_time=booking.end_time,
+        total_amount=booking.total_amount,
+        status=booking.status,
+        payment_method=booking.payment_method,
+        payment_status=booking.payment_status,
+        notes=booking.notes,
+        created_at=booking.created_at,
+        court_name=c_name,
+        venue_name=v_name,
+        venue_address=v_addr,
+        sport_type=s_type
+    )
+
 
 
 @router.get("/me", response_model=List[BookingResponse])
@@ -115,3 +180,117 @@ async def cancel_booking(
     await db.commit()
     await db.refresh(booking)
     return booking
+
+
+class ResendEmailRequest(BaseModel):
+    recipient_email: Optional[str] = None
+
+
+@router.post("/{booking_id}/send-confirmation-email")
+async def resend_confirmation_email(
+    booking_id: str,
+    req: Optional[ResendEmailRequest] = None,
+    payload: dict = Depends(get_current_user_payload),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Reenvia o e-mail de confirmação de agendamento com o modelo oficial.
+    Permite especificar um e-mail de destino alternativo ou utiliza o do usuário autenticado.
+    """
+    user_id = payload.get("sub")
+    role = payload.get("role")
+
+    query = (
+        select(Booking)
+        .where(Booking.id == booking_id)
+        .options(selectinload(Booking.court).selectinload(Court.venue))
+    )
+    result = await db.execute(query)
+    booking = result.scalar_one_or_none()
+
+    if not booking:
+        raise HTTPException(status_code=404, detail="Reserva não encontrada.")
+
+    if booking.user_id != user_id and role not in ["MANAGER", "SUPERADMIN"]:
+        raise HTTPException(status_code=403, detail="Não autorizado a gerenciar esta reserva.")
+
+    u_res = await db.execute(select(User).where(User.id == booking.user_id))
+    user = u_res.scalar_one_or_none()
+
+    target_email = (req.recipient_email if req and req.recipient_email else (user.email if user else "jogador@arenago.com.br")).strip()
+    player_name = user.full_name if user else "Atleta ArenaGo"
+    venue_name = booking.court.venue.name if (booking.court and booking.court.venue) else "Arena Show"
+    court_name = booking.court.name if booking.court else "Quadra Esportiva"
+    date_formatted = booking.start_time.strftime("%d/%m")
+    time_range = f"{booking.start_time.strftime('%H:%M')} às {booking.end_time.strftime('%H:%M')}"
+    booking_code = f"{booking.id[:8].upper()}"
+
+    await send_booking_confirmation_email(
+        to_email=target_email,
+        player_name=player_name,
+        booking_code=booking_code,
+        venue_name=venue_name,
+        court_name=court_name,
+        date_formatted=date_formatted,
+        time_range=time_range,
+        total_amount=float(booking.total_amount),
+        payment_method=booking.payment_method or "PIX"
+    )
+
+    return {
+        "success": True,
+        "message": f"E-mail de confirmação enviado com sucesso para {target_email}",
+        "recipient": target_email
+    }
+
+
+@router.get("/{booking_id}/email-preview", response_class=HTMLResponse)
+async def preview_booking_email(
+    booking_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Retorna o HTML exato do e-mail de confirmação de agendamento para visualização direta ou iframe.
+    """
+    query = (
+        select(Booking)
+        .where(Booking.id == booking_id)
+        .options(selectinload(Booking.court).selectinload(Court.venue))
+    )
+    result = await db.execute(query)
+    booking = result.scalar_one_or_none()
+
+    if not booking:
+        # Template de demonstração caso o ID seja genérico/teste
+        return generate_booking_confirmation_html(
+            player_name="Hagy Maia",
+            booking_code="9317753",
+            venue_name="ARENA SHOW",
+            court_name="Quadra de Areia 1 - 8 x 16 m de jogo. Área coberta.",
+            date_formatted="18/10",
+            time_range="18:00 às 20:00",
+            total_amount=100.0,
+            payment_method="PIX"
+        )
+
+    u_res = await db.execute(select(User).where(User.id == booking.user_id))
+    user = u_res.scalar_one_or_none()
+
+    player_name = user.full_name if user else "Hagy Maia"
+    venue_name = booking.court.venue.name if (booking.court and booking.court.venue) else "ARENA SHOW"
+    court_name = booking.court.name if booking.court else "Quadra de Areia 1"
+    date_formatted = booking.start_time.strftime("%d/%m")
+    time_range = f"{booking.start_time.strftime('%H:%M')} às {booking.end_time.strftime('%H:%M')}"
+    booking_code = f"{booking.id[:8].upper()}"
+
+    return generate_booking_confirmation_html(
+        player_name=player_name,
+        booking_code=booking_code,
+        venue_name=venue_name,
+        court_name=court_name,
+        date_formatted=date_formatted,
+        time_range=time_range,
+        total_amount=float(booking.total_amount),
+        payment_method=booking.payment_method or "PIX"
+    )
+

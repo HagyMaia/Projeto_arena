@@ -66,8 +66,10 @@ async def login(
         "token_type": "bearer",
         "role": user.role,
         "user_id": user.id,
-        "full_name": user.full_name
+        "full_name": user.full_name,
+        "email": user.email
     }
+
 
 
 @router.get("/me", response_model=UserResponse)
@@ -164,8 +166,10 @@ async def google_login(payload: GoogleLoginRequest, db: AsyncSession = Depends(g
         "token_type": "bearer",
         "role": user.role,
         "user_id": user.id,
-        "full_name": user.full_name
+        "full_name": user.full_name,
+        "email": user.email
     }
+
 
 
 class ForgotPasswordRequest(BaseModel):

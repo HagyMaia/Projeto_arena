@@ -298,11 +298,12 @@ export function getStoredToken(): string | null {
   return localStorage.getItem("arenago_token");
 }
 
-export function setStoredToken(token: string, role?: string, fullName?: string) {
+export function setStoredToken(token: string, role?: string, fullName?: string, email?: string) {
   if (typeof window === "undefined") return;
   localStorage.setItem("arenago_token", token);
   if (role) localStorage.setItem("arenago_role", role);
   if (fullName) localStorage.setItem("arenago_name", fullName);
+  if (email) localStorage.setItem("arenago_email", email);
 }
 
 export function clearStoredToken() {
@@ -310,15 +311,18 @@ export function clearStoredToken() {
   localStorage.removeItem("arenago_token");
   localStorage.removeItem("arenago_role");
   localStorage.removeItem("arenago_name");
+  localStorage.removeItem("arenago_email");
 }
 
-export function getStoredUser(): { role: string; name: string } | null {
+export function getStoredUser(): { role: string; name: string; email?: string } | null {
   if (typeof window === "undefined") return null;
   const role = localStorage.getItem("arenago_role");
   const name = localStorage.getItem("arenago_name");
+  const email = localStorage.getItem("arenago_email");
   if (!role) return null;
-  return { role, name: name || "Usuário" };
+  return { role, name: name || "Usuário", email: email || undefined };
 }
+
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getStoredToken();
@@ -410,7 +414,7 @@ export const api = {
     }
 
     const data = await res.json();
-    setStoredToken(data.access_token, data.role, data.full_name);
+    setStoredToken(data.access_token, data.role, data.full_name, data.email);
     return data;
   },
 
@@ -448,9 +452,23 @@ export const api = {
       method: "POST",
       body: JSON.stringify(bodyPayload),
     });
-    setStoredToken(res.access_token, res.role, res.full_name);
+    setStoredToken(res.access_token, res.role, res.full_name, res.email || (!isJwt ? credentialOrEmail : undefined));
     return res;
   },
+
+  async sendBookingConfirmationEmail(bookingId: string, recipientEmail?: string) {
+    return request<{ success: boolean; message: string; recipient: string }>(`/bookings/${bookingId}/send-confirmation-email`, {
+      method: "POST",
+      body: JSON.stringify({ recipient_email: recipientEmail }),
+    });
+  },
+
+  async getBookingEmailPreview(bookingId: string): Promise<string> {
+    const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/email-preview`);
+    if (!res.ok) throw new Error("Falha ao carregar preview do e-mail");
+    return res.text();
+  },
+
 
   async forgotPassword(email: string) {
     return request<{ message: string }>("/auth/forgot-password", {

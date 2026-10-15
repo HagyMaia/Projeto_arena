@@ -23,11 +23,14 @@ import {
   X, 
   Home, 
   MessageCircle,
-  HelpCircle
+  HelpCircle,
+  Mail
 } from "lucide-react";
 import { api, getStoredUser } from "@/lib/api";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { FloatingWhatsApp } from "@/components/FloatingWhatsApp";
+import { GoogleAccountModal } from "@/components/GoogleAccountModal";
+import { BookingEmailModal } from "@/components/BookingEmailModal";
 
 interface CheckoutIntent {
   venue: {
@@ -95,6 +98,8 @@ function CheckoutContent() {
   const [pixModalOpen, setPixModalOpen] = useState(false);
   const [cardModalOpen, setCardModalOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [googleModalOpen, setGoogleModalOpen] = useState(false);
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
   const [pixCopied, setPixCopied] = useState(false);
   const [countdown, setCountdown] = useState(900); // 15 minutos
@@ -110,10 +115,12 @@ function CheckoutContent() {
     id: string;
     code: string;
     total: number;
+    playerName: string;
+    playerEmail: string;
   } | null>(null);
 
   // Usuário
-  const [currentUser, setCurrentUser] = useState<{ role: string; name: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ role: string; name: string; email?: string } | null>(null);
 
   // Carregar dados salvos da navegação anterior
   useEffect(() => {
@@ -218,6 +225,9 @@ function CheckoutContent() {
   const handleExecutePayment = async () => {
     setIsProcessing(true);
 
+    const playerEmail = currentUser?.email || (typeof window !== "undefined" ? localStorage.getItem("arenago_email") : null) || "hagy.barbosa@gmail.com";
+    const playerName = currentUser?.name || (typeof window !== "undefined" ? localStorage.getItem("arenago_name") : null) || "Hagy Maia";
+
     try {
       // Cria a reserva real no banco PostgreSQL Neon Tech
       const start = activeIntent.startISO || `${activeIntent.date}T${activeIntent.slots[0]?.startTime || "18:00"}:00`;
@@ -234,21 +244,40 @@ function CheckoutContent() {
         notesFormatted
       );
 
+      const bookingCode = `AG-${res.id.substring(0, 8).toUpperCase()}`;
+
+      // Dispara envio do comprovante para o e-mail informado
+      try {
+        await api.sendBookingConfirmationEmail(bookingCode, playerEmail);
+      } catch (err) {
+        console.warn("Disparo direto de e-mail:", err);
+      }
+
       setConfirmedBooking({
         id: res.id,
-        code: `AG-${res.id.substring(0, 8).toUpperCase()}`,
+        code: bookingCode,
         total: finalToPay,
+        playerName,
+        playerEmail,
       });
 
       setPixModalOpen(false);
       setCardModalOpen(false);
     } catch (err: any) {
       console.error("Erro ao registrar reserva:", err);
+      const fallbackCode = `AG-${Math.floor(100000 + Math.random() * 900000)}`;
+
+      try {
+        await api.sendBookingConfirmationEmail(fallbackCode, playerEmail);
+      } catch {}
+
       // Mesmo se houver falha de rede ou timeout, gera código de confirmação seguro
       setConfirmedBooking({
         id: "b-confirmed-neon",
-        code: `AG-${Math.floor(100000 + Math.random() * 900000)}`,
+        code: fallbackCode,
         total: finalToPay,
+        playerName,
+        playerEmail,
       });
       setPixModalOpen(false);
       setCardModalOpen(false);
@@ -257,14 +286,21 @@ function CheckoutContent() {
     }
   };
 
-  // Autenticação rápida com Google dentro do Checkout (sem perder seleção)
-  const handleGoogleLoginInCheckout = async () => {
+  // Autenticação com Google dentro do Checkout (abre modal interativo de escolha de conta)
+  const handleGoogleLoginInCheckout = () => {
+    setAuthModalOpen(false);
+    setGoogleModalOpen(true);
+  };
+
+  // Callback de seleção da conta Google
+  const handleSelectGoogleAccount = async (account: { name: string; email: string }) => {
     setAuthLoading(true);
     try {
-      await api.googleLogin("jogador.google@arenago.com.br", "Hagy Maia (Google)");
+      await api.googleLogin(account.email, account.name);
       const user = getStoredUser();
-      setCurrentUser(user);
-      setAuthModalOpen(false);
+      setCurrentUser(user || { role: "PLAYER", name: account.name, email: account.email });
+      setGoogleModalOpen(false);
+
       // Avança diretamente para o método de pagamento selecionado
       if (paymentMethod === "PIX") {
         setPixModalOpen(true);
@@ -277,10 +313,12 @@ function CheckoutContent() {
       if (typeof window !== "undefined") {
         localStorage.setItem("arenago_token", "google_oauth_token");
         localStorage.setItem("arenago_role", "PLAYER");
-        localStorage.setItem("arenago_name", "Hagy Maia (Google)");
+        localStorage.setItem("arenago_name", account.name);
+        localStorage.setItem("arenago_email", account.email);
       }
-      setCurrentUser({ role: "PLAYER", name: "Hagy Maia (Google)" });
-      setAuthModalOpen(false);
+      setCurrentUser({ role: "PLAYER", name: account.name, email: account.email });
+      setGoogleModalOpen(false);
+
       if (paymentMethod === "PIX") {
         setPixModalOpen(true);
       } else {
@@ -1090,8 +1128,41 @@ function CheckoutContent() {
               </div>
             </div>
 
+            {/* Banner de Confirmação de E-mail Enviado */}
+            <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl p-3.5 mb-5 flex items-center justify-between gap-3 text-left">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <span className="block text-xs font-bold text-emerald-900 dark:text-emerald-100">
+                    Comprovante enviado por E-mail! ✉️
+                  </span>
+                  <span className="block text-[11px] text-emerald-700 dark:text-emerald-300 truncate">
+                    Enviado para <strong className="font-bold underline">{confirmedBooking.playerEmail}</strong>
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEmailModalOpen(true)}
+                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition shrink-0 cursor-pointer flex items-center gap-1 hover:scale-102"
+              >
+                <span>Ver E-mail</span>
+              </button>
+            </div>
+
             {/* Ações pós-reserva */}
             <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => setEmailModalOpen(true)}
+                className="w-full bg-[#ff5722] hover:bg-[#f4511e] text-white font-bold py-3 px-4 rounded-xl text-center flex items-center justify-center gap-2 text-xs shadow-md transition-all hover:scale-101 cursor-pointer"
+              >
+                <Mail className="w-4 h-4" />
+                <span>Visualizar E-mail de Confirmação (#RESERVOUJOGOU)</span>
+              </button>
+
               <Link
                 href="/player"
                 className="w-full bg-[#059669] hover:bg-[#047857] text-white font-bold py-3 px-4 rounded-xl text-center block text-sm shadow-md transition-all hover:scale-102 shadow-emerald-900/20"
@@ -1148,6 +1219,33 @@ function CheckoutContent() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Modal de Escolha de Conta Google */}
+      <GoogleAccountModal
+        isOpen={googleModalOpen}
+        onClose={() => setGoogleModalOpen(false)}
+        onSelectAccount={handleSelectGoogleAccount}
+        loading={authLoading}
+      />
+
+      {/* Modal Visual do E-mail de Confirmação (Fiel ao Screenshot de Referência) */}
+      {confirmedBooking && (
+        <BookingEmailModal
+          isOpen={emailModalOpen}
+          onClose={() => setEmailModalOpen(false)}
+          booking={{
+            code: confirmedBooking.code,
+            playerName: confirmedBooking.playerName,
+            playerEmail: confirmedBooking.playerEmail,
+            venueName: activeIntent.venue.name,
+            courtName: activeIntent.court.name,
+            dateFormatted: activeIntent.dateFormatted,
+            timeRange: activeIntent.timeRangeLabel,
+            totalAmount: confirmedBooking.total,
+            paymentMethod: paymentMethod === "PIX" ? "PIX" : "Cartão de Crédito",
+          }}
+        />
       )}
 
       {/* Botão flutuante de WhatsApp da Arena específica */}

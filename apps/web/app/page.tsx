@@ -33,6 +33,8 @@ import { api, Venue, Booking, getStoredUser, clearStoredToken } from "@/lib/api"
 import { getOfficialSupportWhatsAppUrl, OFFICIAL_SUPPORT_PHONE_RAW } from "@/lib/utils";
 import { FloatingWhatsApp } from "@/components/FloatingWhatsApp";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { GoogleAccountModal } from "@/components/GoogleAccountModal";
+
 
 // Arenas padrão para fallback e alta disponibilidade
 const DEFAULT_VENUES: Venue[] = [
@@ -167,7 +169,7 @@ export default function PlayerMarketplacePage() {
   // Estados principais
   const [venues, setVenues] = useState<Venue[]>(DEFAULT_VENUES);
   const [loadingVenues, setLoadingVenues] = useState(true);
-  const [currentUser, setCurrentUser] = useState<{ role: string; name: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ role: string; name: string; email?: string } | null>(null);
   const [userBookings, setUserBookings] = useState<Booking[]>([]);
   const [loadingBookings, setLoadingBookings] = useState(false);
 
@@ -178,6 +180,8 @@ export default function PlayerMarketplacePage() {
   const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [googleLoggingIn, setGoogleLoggingIn] = useState(false);
+  const [googleModalOpen, setGoogleModalOpen] = useState(false);
+
 
   // Inicialização e carregamento
   useEffect(() => {
@@ -284,28 +288,36 @@ export default function PlayerMarketplacePage() {
     });
   }, [venues, selectedCity, searchQuery, selectedSport]);
 
-  // Login rápido com Google 1-clique
-  const handleGoogleQuickLogin = async () => {
+  // Login com Google com seletor e captura de conta/e-mail
+  const handleOpenGoogleLogin = () => {
+    setGoogleModalOpen(true);
+  };
+
+  const handleSelectGoogleAccount = async (account: { name: string; email: string }) => {
     setGoogleLoggingIn(true);
     try {
-      await api.googleLogin("jogador.google@arenago.com.br", "Hagy Maia (Google)");
+      await api.googleLogin(account.email, account.name);
       const u = getStoredUser();
       setCurrentUser(u);
       if (u) {
         const b = await api.getMyBookings();
         setUserBookings(b || []);
       }
+      setGoogleModalOpen(false);
     } catch (err: any) {
       if (typeof window !== "undefined") {
         localStorage.setItem("arenago_token", "google_oauth_token");
         localStorage.setItem("arenago_role", "PLAYER");
-        localStorage.setItem("arenago_name", "Hagy Maia (Google)");
+        localStorage.setItem("arenago_name", account.name);
+        localStorage.setItem("arenago_email", account.email);
       }
-      setCurrentUser({ role: "PLAYER", name: "Hagy Maia (Google)" });
+      setCurrentUser({ role: "PLAYER", name: account.name, email: account.email });
+      setGoogleModalOpen(false);
     } finally {
       setGoogleLoggingIn(false);
     }
   };
+
 
   // Logout
   const handleLogout = () => {
@@ -475,7 +487,7 @@ export default function PlayerMarketplacePage() {
                 <button
                   type="button"
                   disabled={googleLoggingIn}
-                  onClick={handleGoogleQuickLogin}
+                  onClick={handleOpenGoogleLogin}
                   className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white hover:bg-slate-100 text-slate-800 font-bold text-xs shadow-sm transition border border-slate-200 cursor-pointer"
                   title="Entrar com o Google"
                 >
@@ -824,7 +836,7 @@ export default function PlayerMarketplacePage() {
                   <button
                     type="button"
                     disabled={googleLoggingIn}
-                    onClick={handleGoogleQuickLogin}
+                    onClick={handleOpenGoogleLogin}
                     className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-emerald-500 text-slate-800 dark:text-white font-bold text-xs shadow-xs transition cursor-pointer mb-2"
                   >
                     <svg className="w-4 h-4" viewBox="0 0 24 24">
@@ -945,6 +957,15 @@ export default function PlayerMarketplacePage() {
 
       {/* Botão Flutuante de WhatsApp Geral */}
       <FloatingWhatsApp />
+
+      {/* Modal Interativo de Seleção e Captura de Conta Google */}
+      <GoogleAccountModal
+        isOpen={googleModalOpen}
+        onClose={() => setGoogleModalOpen(false)}
+        onSelectAccount={handleSelectGoogleAccount}
+        loading={googleLoggingIn}
+      />
     </div>
   );
 }
+

@@ -40,6 +40,14 @@ class Settings(BaseSettings):
             return [i.strip() for i in v.split(",") if i.strip()]
         return v
 
+    # Email SMTP Settings
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER: str = os.getenv("SMTP_USER", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    EMAILS_FROM_NAME: str = os.getenv("EMAILS_FROM_NAME", "ArenaGo")
+    EMAILS_FROM_EMAIL: str = os.getenv("EMAILS_FROM_EMAIL", "no-reply@arenago.com.br")
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
