@@ -228,6 +228,7 @@ export default function Navbar() {
   const clientNavLinks = [
     { href: "/", label: "Centros Esportivos", icon: Trophy, active: pathname === "/" },
     { href: "/schedule", label: "Agendar Partida", icon: Calendar, active: pathname.startsWith("/schedule") },
+    { href: "/#novidades", label: "Novidades", icon: Sparkles, active: false },
     { href: "/sobre", label: "Sobre o ArenaGo", icon: Info, active: pathname.startsWith("/sobre") },
     { href: "/player", label: isPlayer ? "Minhas Reservas" : "Portal do Jogador", icon: UserIcon, active: pathname.startsWith("/player") },
   ];
@@ -366,13 +367,24 @@ export default function Navbar() {
             </a>
 
             {!user && (
-              <Link
-                href="/login"
-                className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-xs font-bold text-white transition shadow-xs"
-              >
-                <LogIn className="w-3.5 h-3.5" />
-                <span>Entrar</span>
-              </Link>
+              <>
+                <Link
+                  href="/login?portal=admin"
+                  className="hidden xl:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-orange-500/30 bg-orange-500/10 hover:bg-orange-500/20 text-xs font-semibold text-orange-600 dark:text-orange-400 transition"
+                  title="Tem uma arena ou centro esportivo? Cadastre-se na plataforma"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-orange-500" />
+                  <span>Cadastre sua Quadra</span>
+                </Link>
+
+                <Link
+                  href="/login"
+                  className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-xs font-bold text-white transition shadow-xs"
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span>Entrar</span>
+                </Link>
+              </>
             )}
 
             {/* ===============================================================
