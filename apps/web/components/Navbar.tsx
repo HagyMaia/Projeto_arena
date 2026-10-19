@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { api, getStoredUser, clearStoredToken } from "@/lib/api";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { ArenaGoLogo } from "@/components/ArenaGoLogo";
 import { getOfficialSupportWhatsAppUrl, OFFICIAL_SUPPORT_PHONE_RAW } from "@/lib/utils";
 
 export default function Navbar() {
@@ -106,13 +107,11 @@ export default function Navbar() {
   if (isMinimalRoute) {
     return (
       <div className="bg-[#0F172A] text-slate-300 text-[11px] py-1.5 px-4 border-b border-slate-800 z-50 relative flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <Link href="/" className="font-semibold text-slate-200 hover:text-emerald-400 transition hidden sm:inline">
-            ArenaGo Marketplace
-          </Link>
-          <span className="text-slate-500 hidden sm:inline">•</span>
-          <span className="text-slate-400">Checkout Seguro</span>
+          <ArenaGoLogo href="/" size="xs" theme="dark" showSubtitle={false} />
+          <span className="text-slate-600 hidden sm:inline">•</span>
+          <span className="text-slate-400 font-medium hidden sm:inline">Checkout Seguro</span>
         </div>
 
         <div className="flex items-center gap-3 font-medium">
@@ -320,25 +319,14 @@ export default function Navbar() {
          ========================================================================= */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo Brand */}
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 via-teal-600 to-[#ff7043] flex items-center justify-center text-white shadow-md shadow-emerald-600/25 group-hover:scale-105 transition-transform">
-              <span className="font-extrabold text-xl tracking-tighter">AG</span>
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-black text-xl text-slate-900 dark:text-white tracking-tight">
-                  Arena<span className="text-sports-gradient">Go</span>
-                </span>
-                <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300">
-                  {isAdmin ? "admin" : "v1.0"}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">
-                Sua próxima partida a um clique.
-              </p>
-            </div>
-          </Link>
+          {/* Logo Brand Oficial ArenaGo */}
+          <ArenaGoLogo
+            href="/"
+            size="md"
+            badge={isAdmin ? "admin" : undefined}
+            subtitle="Sua próxima partida a um clique."
+            theme="auto"
+          />
 
           {/* Navegação Desktop */}
           <nav className="hidden md:flex items-center gap-1">

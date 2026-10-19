@@ -1,8 +1,9 @@
+from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -19,6 +20,89 @@ from app.services.email_service import (
 )
 
 router = APIRouter(prefix="/bookings", tags=["Reservas de Jogadores"])
+
+
+class CheckAvailabilityRequest(BaseModel):
+    court_id: str
+    start_time: datetime
+    end_time: datetime
+
+
+class CheckAvailabilityResponse(BaseModel):
+    available: bool
+    court_id: str
+    court_name: Optional[str] = None
+    venue_name: Optional[str] = None
+    message: str
+
+
+@router.post("/check-availability", response_model=CheckAvailabilityResponse)
+async def check_booking_availability(
+    req: CheckAvailabilityRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Revalida a disponibilidade de um horário antes ou após o login do usuário,
+    garantindo que não ocorram reservas duplicadas ou conflitos de agendamento.
+    """
+    from app.services.booking_service import expire_unpaid_bookings
+    await expire_unpaid_bookings(db)
+
+    # 1. Carregar quadra e arena
+    c_res = await db.execute(
+        select(Court).where(Court.id == req.court_id, Court.is_active.is_(True)).options(selectinload(Court.venue))
+    )
+    court = c_res.scalar_one_or_none()
+    if not court:
+        return CheckAvailabilityResponse(
+            available=False,
+            court_id=req.court_id,
+            message="Quadra não encontrada ou inativa."
+        )
+
+    # 2. Ajustar timezones caso venham naive
+    start_dt = req.start_time if req.start_time.tzinfo else req.start_time.replace(tzinfo=timezone.utc)
+    end_dt = req.end_time if req.end_time.tzinfo else req.end_time.replace(tzinfo=timezone.utc)
+
+    # 3. Verificar sobreposição no banco de dados
+    now = datetime.now(timezone.utc)
+    overlap_query = select(Booking).where(
+        Booking.court_id == req.court_id,
+        or_(
+            Booking.status == "CONFIRMED",
+            and_(
+                Booking.status == "PENDING",
+                or_(Booking.expires_at.is_(None), Booking.expires_at > now)
+            )
+        ),
+        or_(
+            and_(Booking.start_time <= start_dt, Booking.end_time > start_dt),
+            and_(Booking.start_time < end_dt, Booking.end_time >= end_dt),
+            and_(Booking.start_time >= start_dt, Booking.end_time <= end_dt)
+        )
+    )
+    existing_result = await db.execute(overlap_query)
+    conflict = existing_result.scalar_one_or_none()
+
+    c_name = court.name
+    v_name = court.venue.name if court.venue else "ArenaGo"
+
+    if conflict:
+        return CheckAvailabilityResponse(
+            available=False,
+            court_id=court.id,
+            court_name=c_name,
+            venue_name=v_name,
+            message="O horário selecionado não está mais disponível pois já foi reservado ou está em processo de pagamento."
+        )
+
+    return CheckAvailabilityResponse(
+        available=True,
+        court_id=court.id,
+        court_name=c_name,
+        venue_name=v_name,
+        message="Horário disponível para reserva!"
+    )
 
 
 @router.post("", response_model=BookingResponse, status_code=status.HTTP_201_CREATED)

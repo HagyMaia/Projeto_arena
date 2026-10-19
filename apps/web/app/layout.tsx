@@ -5,7 +5,22 @@ import Footer from "@/components/Footer";
 
 export const metadata: Metadata = {
   title: "ArenaGo — Sua próxima partida a um clique.",
-  description: "Marketplace de aluguel de quadras esportivas e plataforma SaaS de gestão de arenas.",
+  description: "Marketplace oficial de aluguel de quadras esportivas e plataforma SaaS de gestão integrada de arenas.",
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+    apple: [
+      { url: "/apple-icon.svg", type: "image/svg+xml" },
+    ],
+  },
+  openGraph: {
+    title: "ArenaGo — Sua próxima partida a um clique.",
+    description: "Reserve quadras de futebol, beach tennis, futevôlei e vôlei em tempo real com confirmação imediata.",
+    siteName: "ArenaGo",
+    locale: "pt_BR",
+    type: "website",
+  },
 };
 
 export default function RootLayout({

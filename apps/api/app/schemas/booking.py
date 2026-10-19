@@ -10,6 +10,7 @@ class BookingCreate(BaseModel):
     end_time: datetime
     payment_method: str = "PIX" # PIX, CREDIT_CARD, CASH_AT_VENUE
     notes: Optional[str] = None
+    booking_type: Optional[str] = "ONLINE_SINGLE"
 
 
 class BookingResponse(BaseModel):

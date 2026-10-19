@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== "undefined" ? "/api/v1" : "http://localhost:8000/api/v1");
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== "undefined" ? "/api/v1" : "http://localhost:8001/api/v1");
 
 export interface User {
   id: string;
@@ -357,12 +357,13 @@ export function getStoredToken(): string | null {
   return localStorage.getItem("arenago_token");
 }
 
-export function setStoredToken(token: string, role?: string, fullName?: string, email?: string) {
+export function setStoredToken(token: string, role?: string, fullName?: string, email?: string, userId?: string) {
   if (typeof window === "undefined") return;
   localStorage.setItem("arenago_token", token);
   if (role) localStorage.setItem("arenago_role", role);
   if (fullName) localStorage.setItem("arenago_name", fullName);
   if (email) localStorage.setItem("arenago_email", email);
+  if (userId) localStorage.setItem("arenago_user_id", userId);
 }
 
 export function clearStoredToken() {
@@ -371,15 +372,18 @@ export function clearStoredToken() {
   localStorage.removeItem("arenago_role");
   localStorage.removeItem("arenago_name");
   localStorage.removeItem("arenago_email");
+  localStorage.removeItem("arenago_user_id");
 }
 
-export function getStoredUser(): { role: string; name: string; email?: string } | null {
+export function getStoredUser(): { id?: string; role: string; name: string; email?: string } | null {
   if (typeof window === "undefined") return null;
+  const token = localStorage.getItem("arenago_token");
   const role = localStorage.getItem("arenago_role");
   const name = localStorage.getItem("arenago_name");
   const email = localStorage.getItem("arenago_email");
-  if (!role) return null;
-  return { role, name: name || "Usuário", email: email || undefined };
+  const id = localStorage.getItem("arenago_user_id") || undefined;
+  if (!token || !role) return null;
+  return { id, role, name: name || "Usuário", email: email || undefined };
 }
 
 
@@ -405,7 +409,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       const errorJson = await res.json();
       errorDetail = errorJson.detail || errorDetail;
     } catch {}
-    throw new Error(errorDetail);
+    const err: any = new Error(errorDetail);
+    err.status = res.status;
+    throw err;
   }
 
   return res.json() as Promise<T>;
@@ -473,7 +479,7 @@ export const api = {
     }
 
     const data = await res.json();
-    setStoredToken(data.access_token, data.role, data.full_name, data.email);
+    setStoredToken(data.access_token, data.role, data.full_name, data.email, data.user_id);
     return data;
   },
 
@@ -511,8 +517,12 @@ export const api = {
       method: "POST",
       body: JSON.stringify(bodyPayload),
     });
-    setStoredToken(res.access_token, res.role, res.full_name, res.email || (!isJwt ? credentialOrEmail : undefined));
+    setStoredToken(res.access_token, res.role, res.full_name, res.email || (!isJwt ? credentialOrEmail : undefined), res.user_id);
     return res;
+  },
+
+  async loginWithGoogle(email?: string, name?: string) {
+    return this.googleLogin(email, name);
   },
 
   async sendBookingConfirmationEmail(bookingId: string, recipientEmail?: string) {
@@ -542,6 +552,29 @@ export const api = {
   },
 
   // Bookings
+  async checkAvailability(courtId: string, startTime: string, endTime: string): Promise<{
+    available: boolean;
+    court_id: string;
+    start_time: string;
+    end_time: string;
+    reason?: string;
+  }> {
+    return request<{
+      available: boolean;
+      court_id: string;
+      start_time: string;
+      end_time: string;
+      reason?: string;
+    }>("/bookings/check-availability", {
+      method: "POST",
+      body: JSON.stringify({
+        court_id: courtId,
+        start_time: startTime,
+        end_time: endTime,
+      }),
+    });
+  },
+
   async createBooking(courtId: string, startTime: string, endTime: string, bookingType: string = "ONLINE_SINGLE", notes?: string): Promise<Booking> {
     return request<Booking>("/bookings", {
       method: "POST",

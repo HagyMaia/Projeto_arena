@@ -27,11 +27,12 @@ import {
   Mail,
   AlertCircle
 } from "lucide-react";
-import { api, getStoredUser } from "@/lib/api";
+import { api, getStoredUser, clearStoredToken } from "@/lib/api";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { FloatingWhatsApp } from "@/components/FloatingWhatsApp";
 import { GoogleAccountModal } from "@/components/GoogleAccountModal";
 import { BookingEmailModal } from "@/components/BookingEmailModal";
+import { ArenaGoLogo } from "@/components/ArenaGoLogo";
 
 interface CheckoutIntent {
   venue: {
@@ -128,25 +129,35 @@ function CheckoutContent() {
   } | null>(null);
 
   // Usuário
-  const [currentUser, setCurrentUser] = useState<{ role: string; name: string; email?: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ id?: string; role: string; name: string; email?: string } | null>(null);
 
-  // Carregar dados salvos da navegação anterior
+  // Revalidação de Disponibilidade em tempo real
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
+  const [availabilityConflict, setAvailabilityConflict] = useState<string | null>(null);
+  const [isAvailabilityConfirmed, setIsAvailabilityConfirmed] = useState(false);
+
+  // Carregar dados salvos da navegação anterior e verificar autenticação obrigatória
   useEffect(() => {
-    setCurrentUser(getStoredUser());
+    const user = getStoredUser();
+    if (!user) {
+      router.replace("/login?redirect=/checkout&flow=booking");
+      return;
+    }
+    setCurrentUser(user);
 
     if (typeof window !== "undefined") {
-      const stored = sessionStorage.getItem("arenago_checkout_intent");
+      const stored = sessionStorage.getItem("arenago_checkout_intent") || localStorage.getItem("arenago_checkout_intent");
       if (stored) {
         try {
           const parsed: CheckoutIntent = JSON.parse(stored);
           setIntent(parsed);
-          if (parsed.court.sportType) {
+          if (parsed.court?.sportType) {
             setSelectedSport(parsed.court.sportType.replace(/_/g, " "));
           }
         } catch {}
       }
     }
-  }, []);
+  }, [router]);
 
   // Intent ativo (ou fallback realista da Arena Show se acessado diretamente)
   const activeIntent: CheckoutIntent = useMemo(() => {
@@ -181,6 +192,41 @@ function CheckoutContent() {
       endISO: "2026-10-18T20:00:00",
     };
   }, [intent]);
+
+  // Checagem em tempo real de conflitos de disponibilidade para evitar reservas duplicadas
+  const checkSlotsAvailability = async () => {
+    const courtId = activeIntent.court?.id;
+    const start = activeIntent.startISO || `${activeIntent.date}T${activeIntent.slots[0]?.startTime || "18:00"}:00`;
+    const end = activeIntent.endISO || `${activeIntent.date}T${activeIntent.slots[activeIntent.slots.length - 1]?.endTime || "20:00"}:00`;
+
+    if (!courtId || !start || !end) return;
+
+    setIsCheckingAvailability(true);
+    try {
+      const res = await api.checkAvailability(courtId, start, end);
+      if (res && !res.available) {
+        setAvailabilityConflict(res.reason || "Os horários selecionados não estão mais disponíveis. Outro usuário concluiu a reserva recentemente.");
+        setIsAvailabilityConfirmed(false);
+      } else {
+        setAvailabilityConflict(null);
+        setIsAvailabilityConfirmed(true);
+      }
+    } catch (err: any) {
+      console.warn("Aviso ao checar disponibilidade:", err);
+      if (err.status === 409) {
+        setAvailabilityConflict("Conflito: estes horários já estão ocupados por outra reserva confirmada.");
+        setIsAvailabilityConfirmed(false);
+      }
+    } finally {
+      setIsCheckingAvailability(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeIntent?.court?.id) {
+      checkSlotsAvailability();
+    }
+  }, [activeIntent?.court?.id, activeIntent?.date, activeIntent?.timeRangeLabel]);
 
   // Manipulador de Complementos
   const toggleComplement = (id: string) => {
@@ -274,6 +320,15 @@ function CheckoutContent() {
     const notesFormatted = notes ? `${notes} [Esporte: ${selectedSport}]` : `[Esporte: ${selectedSport}]`;
 
     try {
+      // Revalidação em tempo real de disponibilidade antes de gerar cobrança
+      const avail = await api.checkAvailability(activeIntent.court.id, start, end);
+      if (avail && !avail.available) {
+        setAvailabilityConflict(avail.reason || "Os horários selecionados não estão mais disponíveis. Outro usuário concluiu a reserva recentemente.");
+        setIsAvailabilityConfirmed(false);
+        setIsProcessing(false);
+        return;
+      }
+
       const res = await api.createPaymentIntent({
         court_id: activeIntent.court.id,
         start_time: start,
@@ -289,15 +344,18 @@ function CheckoutContent() {
       setCountdown(600); // 10 minutos
       setPixModalOpen(true);
     } catch (err: any) {
-      console.warn("Fallback de intent Pix:", err);
-      // Fallback seguro caso backend esteja em migração
-      const fallbackBookingId = `b-neon-${Date.now().toString(36)}`;
-      setCurrentBookingId(fallbackBookingId);
-      const cleanAmount = finalToPay.toFixed(2);
-      const fallbackCode = `00020126580014br.gov.bcb.pix0136arenago-pix@pagamentos.arenago.com.br520400005303986540${cleanAmount}5802BR5916ARENAGO TECH LTDA6009SAO PAULO62140510ARENAGO${activeIntent.date.replace(/-/g, "")}6304`;
-      setDynamicPixCode(fallbackCode);
-      setDynamicQrImage(`https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(fallbackCode)}`);
-      setPixModalOpen(true);
+      console.warn("Erro ao iniciar cobrança Pix:", err);
+      if (err.status === 401) {
+        clearStoredToken();
+        router.push("/login?redirect=/checkout&flow=booking");
+        return;
+      }
+      if (err.status === 409) {
+        setAvailabilityConflict(err.message || "Conflito: estes horários acabaram de ser ocupados por outra reserva confirmada.");
+        setIsAvailabilityConfirmed(false);
+        return;
+      }
+      setPaymentError(err.message || "Não foi possível gerar a cobrança Pix. Verifique os dados ou tente novamente.");
     } finally {
       setIsProcessing(false);
     }
@@ -307,8 +365,8 @@ function CheckoutContent() {
   const handleExecuteCardPayment = async () => {
     setIsProcessing(true);
     setPaymentError(null);
-    const playerEmail = currentUser?.email || (typeof window !== "undefined" ? localStorage.getItem("arenago_email") : null) || "hagy.barbosa@gmail.com";
-    const playerName = currentUser?.name || (typeof window !== "undefined" ? localStorage.getItem("arenago_name") : null) || "Hagy Maia";
+    const playerEmail = currentUser?.email || (typeof window !== "undefined" ? localStorage.getItem("arenago_email") : null) || "jogador@arenago.com.br";
+    const playerName = currentUser?.name || (typeof window !== "undefined" ? localStorage.getItem("arenago_name") : null) || "Jogador ArenaGo";
 
     const start = activeIntent.startISO || `${activeIntent.date}T${activeIntent.slots[0]?.startTime || "18:00"}:00`;
     const end = activeIntent.endISO || `${activeIntent.date}T${activeIntent.slots[activeIntent.slots.length - 1]?.endTime || "20:00"}:00`;
@@ -316,6 +374,16 @@ function CheckoutContent() {
     const notesFormatted = notes ? `${notes} [Esporte: ${selectedSport}]` : `[Esporte: ${selectedSport}]`;
 
     try {
+      // Revalidação preventiva de disponibilidade
+      const avail = await api.checkAvailability(activeIntent.court.id, start, end);
+      if (avail && !avail.available) {
+        setAvailabilityConflict(avail.reason || "Os horários selecionados não estão mais disponíveis.");
+        setIsAvailabilityConfirmed(false);
+        setIsProcessing(false);
+        setCardModalOpen(false);
+        return;
+      }
+
       const res = await api.createPaymentIntent({
         court_id: activeIntent.court.id,
         start_time: start,
@@ -334,6 +402,12 @@ function CheckoutContent() {
         await api.sendBookingConfirmationEmail(bookingCode, playerEmail);
       } catch {}
 
+      // Limpar intenção persistida após conclusão bem-sucedida
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("arenago_checkout_intent");
+        localStorage.removeItem("arenago_checkout_intent");
+      }
+
       setConfirmedBooking({
         id: res.booking_id,
         code: bookingCode,
@@ -344,7 +418,17 @@ function CheckoutContent() {
       setCardModalOpen(false);
     } catch (err: any) {
       console.error("Erro no cartão:", err);
-      // Se for recusa informada pelo gateway
+      if (err.status === 401) {
+        clearStoredToken();
+        router.push("/login?redirect=/checkout&flow=booking");
+        return;
+      }
+      if (err.status === 409) {
+        setAvailabilityConflict(err.message || "Conflito: este horário já foi reservado.");
+        setIsAvailabilityConfirmed(false);
+        setCardModalOpen(false);
+        return;
+      }
       setPaymentError(err.message || "Cartão recusado pela operadora. Tente outro cartão ou selecione Pix.");
     } finally {
       setIsProcessing(false);
@@ -357,9 +441,15 @@ function CheckoutContent() {
     setIsProcessing(true);
     try {
       const statusRes = await api.getPaymentStatus(currentBookingId);
+      const playerEmail = currentUser?.email || (typeof window !== "undefined" ? localStorage.getItem("arenago_email") : null) || "jogador@arenago.com.br";
+      const playerName = currentUser?.name || (typeof window !== "undefined" ? localStorage.getItem("arenago_name") : null) || "Jogador ArenaGo";
+
       if (statusRes.is_confirmed) {
-        const playerEmail = currentUser?.email || (typeof window !== "undefined" ? localStorage.getItem("arenago_email") : null) || "hagy.barbosa@gmail.com";
-        const playerName = currentUser?.name || (typeof window !== "undefined" ? localStorage.getItem("arenago_name") : null) || "Hagy Maia";
+        if (typeof window !== "undefined") {
+          sessionStorage.removeItem("arenago_checkout_intent");
+          localStorage.removeItem("arenago_checkout_intent");
+        }
+
         setConfirmedBooking({
           id: currentBookingId,
           code: statusRes.voucher_code || `AG-${currentBookingId.substring(0, 8).toUpperCase()}`,
@@ -369,30 +459,10 @@ function CheckoutContent() {
         });
         setPixModalOpen(false);
       } else {
-        // Simular confirmação instantânea em sandbox de teste se solicitado
-        const playerEmail = currentUser?.email || (typeof window !== "undefined" ? localStorage.getItem("arenago_email") : null) || "hagy.barbosa@gmail.com";
-        const playerName = currentUser?.name || (typeof window !== "undefined" ? localStorage.getItem("arenago_name") : null) || "Hagy Maia";
-        setConfirmedBooking({
-          id: currentBookingId,
-          code: `AG-${currentBookingId.substring(0, 8).toUpperCase()}`,
-          total: finalToPay,
-          playerName,
-          playerEmail,
-        });
-        setPixModalOpen(false);
+        setPaymentError("Pagamento via PIX ainda não identificado pelo banco. Aguarde alguns instantes ou atualize.");
       }
-    } catch (err) {
-      // Fallback de confirmação
-      const playerEmail = currentUser?.email || "hagy.barbosa@gmail.com";
-      const playerName = currentUser?.name || "Hagy Maia";
-      setConfirmedBooking({
-        id: currentBookingId,
-        code: `AG-${Math.floor(100000 + Math.random() * 900000)}`,
-        total: finalToPay,
-        playerName,
-        playerEmail,
-      });
-      setPixModalOpen(false);
+    } catch (err: any) {
+      setPaymentError(err.message || "Erro ao consultar status do pagamento.");
     } finally {
       setIsProcessing(false);
     }
@@ -408,33 +478,25 @@ function CheckoutContent() {
   const handleSelectGoogleAccount = async (account: { name: string; email: string }) => {
     setAuthLoading(true);
     try {
-      await api.googleLogin(account.email, account.name);
+      const res = await api.googleLogin(account.email, account.name);
       const user = getStoredUser();
-      setCurrentUser(user || { role: "PLAYER", name: account.name, email: account.email });
+      setCurrentUser(user || { id: res.user_id, role: res.role || "PLAYER", name: res.full_name || account.name, email: res.email || account.email });
       setGoogleModalOpen(false);
 
-      // Avança diretamente para o método de pagamento selecionado
-      if (paymentMethod === "PIX") {
-        handleInitiatePixPayment();
-      } else {
-        setCardModalOpen(true);
+      // Revalidar disponibilidade dos horários imediatamente após o login
+      await checkSlotsAvailability();
+
+      // Avança diretamente para o método de pagamento selecionado se não houver conflito
+      if (!availabilityConflict) {
+        if (paymentMethod === "PIX") {
+          handleInitiatePixPayment();
+        } else {
+          setCardModalOpen(true);
+        }
       }
     } catch (err: any) {
-      console.warn("Usando sessão de demonstração:", err);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("arenago_token", "google_oauth_token");
-        localStorage.setItem("arenago_role", "PLAYER");
-        localStorage.setItem("arenago_name", account.name);
-        localStorage.setItem("arenago_email", account.email);
-      }
-      setCurrentUser({ role: "PLAYER", name: account.name, email: account.email });
-      setGoogleModalOpen(false);
-
-      if (paymentMethod === "PIX") {
-        handleInitiatePixPayment();
-      } else {
-        setCardModalOpen(true);
-      }
+      console.error("Erro na autenticação Google:", err);
+      setPaymentError("Não foi possível autenticar com o Google. Tente novamente.");
     } finally {
       setAuthLoading(false);
     }
@@ -444,8 +506,11 @@ function CheckoutContent() {
   const handlePrimaryButtonClick = () => {
     if (!paymentMethod) return;
 
+    if (availabilityConflict || isCheckingAvailability) return;
+
     // Se o jogador não estiver autenticado, exige autenticação preservando a seleção
-    if (!currentUser) {
+    const storedUser = getStoredUser();
+    if (!storedUser || !currentUser) {
       setAuthModalOpen(true);
       return;
     }
@@ -475,22 +540,7 @@ function CheckoutContent() {
       {/* Top Header Marinho com Verde-Esmeralda */}
       <header className="bg-[#0F172A] text-white shadow-md relative z-30 border-b border-slate-800">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="w-10 h-8 rounded-lg bg-emerald-600/30 border border-emerald-500/50 flex flex-col items-center justify-center p-1 backdrop-blur-xs group-hover:scale-105 transition-transform">
-              <div className="flex gap-1 mb-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-              </div>
-              <div className="w-6 h-2.5 bg-emerald-500/40 rounded-xs flex items-center justify-around">
-                <span className="w-1 h-1 rounded-full bg-white"></span>
-                <span className="w-1 h-1 rounded-full bg-white"></span>
-              </div>
-            </div>
-            <span className="text-2xl font-black tracking-tight text-white font-sans lowercase">
-              arena<span className="text-emerald-400">go</span>
-            </span>
-          </Link>
+          <ArenaGoLogo href="/" size="md" theme="dark" showSubtitle={false} />
 
           <div className="flex items-center gap-3 sm:gap-4 text-sm">
             <ThemeToggle />
@@ -543,6 +593,44 @@ function CheckoutContent() {
               Finalize seu Agendamento
             </h1>
           </div>
+
+          {/* Status de Disponibilidade em Tempo Real */}
+          {isCheckingAvailability && (
+            <div className="mb-6 p-3 rounded-xl bg-slate-100 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 flex items-center gap-2.5 text-xs text-slate-600 dark:text-slate-300 animate-pulse">
+              <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin shrink-0" />
+              <span>Verificando disponibilidade atualizada dos horários selecionados...</span>
+            </div>
+          )}
+
+          {availabilityConflict && (
+            <div className="mb-6 p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-rose-800 dark:text-rose-200">
+              <div className="flex items-start sm:items-center gap-2.5">
+                <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5 sm:mt-0" />
+                <div>
+                  <span className="font-bold block sm:inline">Conflito de Horário: </span>
+                  <span>{availabilityConflict}</span>
+                </div>
+              </div>
+              <Link
+                href={activeIntent.venue?.id ? `/schedule?venue=${activeIntent.venue.id}&date=${activeIntent.date}` : "/"}
+                className="inline-flex items-center justify-center px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition shrink-0"
+              >
+                Escolher outro horário
+              </Link>
+            </div>
+          )}
+
+          {!isCheckingAvailability && !availabilityConflict && isAvailabilityConfirmed && (
+            <div className="mb-6 p-2.5 px-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-between text-xs text-emerald-800 dark:text-emerald-300">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span>Horários verificados e disponíveis em tempo real na arena parceira.</span>
+              </div>
+              <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 hidden sm:inline">
+                Sessão segura
+              </span>
+            </div>
+          )}
 
           {/* Grid de 3 Colunas: Detalhes | Pagamento | Resumo */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -909,16 +997,20 @@ function CheckoutContent() {
                 {/* Botão de Confirmação Principal */}
                 <button
                   type="button"
-                  disabled={!paymentMethod || isProcessing}
+                  disabled={!paymentMethod || isProcessing || isCheckingAvailability || Boolean(availabilityConflict)}
                   onClick={handlePrimaryButtonClick}
                   className={`w-full mt-4 py-3.5 px-4 rounded-xl font-bold text-xs sm:text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                    !paymentMethod || isProcessing
+                    !paymentMethod || isProcessing || isCheckingAvailability || Boolean(availabilityConflict)
                       ? "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed"
                       : "btn-coral-gradient hover:scale-[1.01] active:scale-[0.99] shadow-lg"
                   }`}
                 >
                   {isProcessing ? (
                     <span>Processando agendamento...</span>
+                  ) : isCheckingAvailability ? (
+                    <span>Verificando disponibilidade...</span>
+                  ) : availabilityConflict ? (
+                    <span>Horários Indisponíveis</span>
                   ) : paymentMethod === "PIX" ? (
                     <span>Pagar com PIX — R$ {finalToPay.toFixed(2).replace(".", ",")}</span>
                   ) : paymentMethod === "CREDIT_CARD" ? (

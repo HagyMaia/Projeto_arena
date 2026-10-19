@@ -11,16 +11,25 @@ _in_memory_locks: dict[str, asyncio.Lock] = {}
 _in_memory_keys: set[str] = set()
 
 _redis_pool: Optional[aioredis.Redis] = None
+_redis_last_check: float = 0.0
 
 
 async def get_redis() -> Optional[aioredis.Redis]:
-    global _redis_pool
+    global _redis_pool, _redis_last_check
+    import time
+    now = time.time()
+    # Se já tentou nos últimos 60 segundos e falhou, não tenta de novo imediatamente
+    if _redis_pool is None and (now - _redis_last_check < 60.0):
+        return None
+
     if _redis_pool is None:
+        _redis_last_check = now
         try:
             client = aioredis.from_url(
                 settings.REDIS_URL,
                 decode_responses=True,
-                socket_timeout=2.0
+                socket_timeout=0.5,
+                socket_connect_timeout=0.5
             )
             await client.ping()
             _redis_pool = client

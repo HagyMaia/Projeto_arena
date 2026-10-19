@@ -35,6 +35,7 @@ import { getOfficialSupportWhatsAppUrl, OFFICIAL_SUPPORT_PHONE_RAW } from "@/lib
 import { FloatingWhatsApp } from "@/components/FloatingWhatsApp";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { GoogleAccountModal } from "@/components/GoogleAccountModal";
+import { ArenaGoLogo } from "@/components/ArenaGoLogo";
 
 
 // Arenas padrão para fallback e alta disponibilidade
@@ -377,22 +378,7 @@ export default function PlayerMarketplacePage() {
           
           {/* Logo ArenaGo + Botão Conheça o ArenaGo */}
           <div className="flex items-center gap-4 sm:gap-6">
-            <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex flex-col items-center justify-center p-1 backdrop-blur-xs group-hover:scale-105 transition-transform shadow-inner">
-                <div className="flex gap-1 mb-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                </div>
-                <div className="w-6 h-2 bg-emerald-500/40 rounded-xs flex items-center justify-around">
-                  <span className="w-1 h-1 rounded-full bg-white"></span>
-                  <span className="w-1 h-1 rounded-full bg-white"></span>
-                </div>
-              </div>
-              <span className="text-2xl font-black tracking-tight text-white font-sans lowercase">
-                arena<span className="text-emerald-400">go</span>
-              </span>
-            </Link>
+            <ArenaGoLogo href="/" size="md" theme="dark" showSubtitle={false} />
 
             {/* Botão "Conheça o ArenaGo" abrindo a página institucional completa */}
             <Link

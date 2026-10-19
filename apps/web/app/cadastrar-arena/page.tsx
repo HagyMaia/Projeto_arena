@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { api, ArenaRequestSubmitResponse } from "@/lib/api";
 import { OFFICIAL_SUPPORT_PHONE_RAW } from "@/lib/utils";
+import { ArenaGoLogo } from "@/components/ArenaGoLogo";
 
 const AVAILABLE_MODALITIES = [
   { id: "BEACH_TENNIS", label: "Beach Tennis", icon: "🎾" },
@@ -181,15 +182,19 @@ export default function CadastrarArenaPage() {
     <div className="min-h-screen bg-slate-50 dark:bg-[#0B1220] text-slate-900 dark:text-slate-100 py-8 px-4 sm:px-6 lg:px-8 transition-colors">
       <div className="max-w-4xl mx-auto">
         
-        {/* Navegação Superior */}
+        {/* Navegação Superior com Logo Oficial */}
         <div className="mb-6 flex items-center justify-between">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Voltar ao Marketplace</span>
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Voltar</span>
+            </Link>
+            <span className="text-slate-300 dark:text-slate-700">|</span>
+            <ArenaGoLogo href="/" size="xs" theme="auto" showSubtitle={false} />
+          </div>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">

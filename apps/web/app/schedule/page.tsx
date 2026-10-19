@@ -21,8 +21,9 @@ import {
   Layers,
   Filter
 } from "lucide-react";
-import { api, Venue, Court } from "@/lib/api";
+import { api, Venue, Court, getStoredUser } from "@/lib/api";
 import { FloatingWhatsApp } from "@/components/FloatingWhatsApp";
+import { GoogleAccountModal } from "@/components/GoogleAccountModal";
 
 // Arenas padrão para fallback e alternância rápida
 const DEFAULT_VENUES: Venue[] = [
@@ -152,6 +153,10 @@ function ScheduleContent() {
 
   // Modo de reserva: Avulsa ou Mensalista Semanal
   const [bookingMode, setBookingMode] = useState<"SINGLE" | "RECURRING">("SINGLE");
+
+  // Autenticação Google obrigatória ao avançar
+  const [googleModalOpen, setGoogleModalOpen] = useState(false);
+  const [googleLoggingIn, setGoogleLoggingIn] = useState(false);
 
   // Calendário Horizontal: próximos 14 dias
   const datesList = useMemo(() => {
@@ -393,9 +398,32 @@ function ScheduleContent() {
 
     if (typeof window !== "undefined") {
       sessionStorage.setItem("arenago_checkout_intent", JSON.stringify(checkoutData));
+      localStorage.setItem("arenago_checkout_intent", JSON.stringify(checkoutData));
+    }
+
+    const currentUser = getStoredUser();
+    if (!currentUser) {
+      setGoogleModalOpen(true);
+      return;
     }
 
     router.push("/checkout");
+  };
+
+  // Callback de autenticação Google obrigatória com preservação do agendamento
+  const handleSelectGoogleAccount = async (account: { name: string; email: string }) => {
+    setGoogleLoggingIn(true);
+    try {
+      await api.loginWithGoogle(account.email, account.name);
+      setGoogleModalOpen(false);
+      router.push("/checkout");
+    } catch (err) {
+      console.error("Falha na autenticação Google:", err);
+      // Fallback seguro redirecionando para a tela de login preservando intent
+      router.push("/login?redirect=/checkout&flow=booking");
+    } finally {
+      setGoogleLoggingIn(false);
+    }
   };
 
   return (
@@ -803,6 +831,14 @@ function ScheduleContent() {
       <FloatingWhatsApp
         venueIdOrSlug={selectedVenue?.slug || selectedVenue?.id}
         venueName={selectedVenue?.name}
+      />
+
+      {/* Modal Interativo de Login Obrigatório com Google ao Avançar */}
+      <GoogleAccountModal
+        isOpen={googleModalOpen}
+        onClose={() => setGoogleModalOpen(false)}
+        onSelectAccount={handleSelectGoogleAccount}
+        loading={googleLoggingIn}
       />
     </div>
   );
